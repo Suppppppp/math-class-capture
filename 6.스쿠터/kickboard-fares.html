@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>몇 분부터 B사가 유리할까</title>
+<style>
+  :root{
+    --abyss:#0A1C26; --deep:#102B39; --panel:#16374A; --panel-2:#1D465B;
+    --line:#2C5A70; --text:#D9E8EE; --dim:#7BA0B1; --sand:#EFE4CB;
+    --a:#F2A03D;  --a-soft:rgba(242,160,61,.14);
+    --b:#5BC0EB;  --b-soft:rgba(91,192,235,.14);
+    --win:#4FD1A5; --bad:#F27A7A;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ min-height:100%; }
+  body{
+    margin:0;
+    background:radial-gradient(120% 70% at 50% -10%, #17435A 0%, var(--abyss) 60%);
+    color:var(--text);
+    font-family:-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", system-ui, sans-serif;
+    padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom);
+  }
+  button{
+    font:inherit; color:inherit; cursor:pointer; background:transparent;
+    border:1px solid var(--line); border-radius:9px; padding:7px 12px;
+    transition:background .15s, border-color .15s;
+  }
+  button:hover{ background:var(--panel); }
+  button[aria-pressed="true"]{ background:var(--panel-2); border-color:var(--sand); color:#fff; }
+  button:focus-visible{ outline:2px solid var(--a); outline-offset:2px; }
+
+  /* ---------- bar ---------- */
+  .bar{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    padding:11px clamp(12px,3vw,28px); border-bottom:1px solid var(--line);
+  }
+  .bar h1{ margin:0; font-size:16px; font-weight:700; letter-spacing:-.01em; }
+  .bar h1 small{ color:var(--dim); font-weight:500; margin-left:8px; font-size:13px; }
+  .bar .spacer{ flex:1; }
+  .bar button{ font-size:13px; }
+
+  /* ---------- layout ---------- */
+  .wrap{
+    display:grid; gap:14px;
+    grid-template-columns:minmax(260px, 320px) 1fr;
+    grid-template-areas:
+      "controls graph"
+      "table    table"
+      "solve    solve"
+      "asks     asks";
+    padding:clamp(12px,2.5vw,24px);
+    max-width:1200px; margin:0 auto;
+  }
+  @media (max-width:820px){
+    .wrap{ grid-template-columns:1fr; grid-template-areas:"graph" "controls" "table" "solve" "asks"; }
+  }
+  .card{
+    background:linear-gradient(180deg, var(--panel) 0%, rgba(16,43,57,.6) 100%);
+    border:1px solid var(--line); border-radius:16px; padding:clamp(12px,2vw,18px);
+  }
+  .card h2{ margin:0 0 10px; font-size:13px; color:var(--dim); font-weight:600; letter-spacing:.02em; }
+
+  /* ---------- controls ---------- */
+  .controls{ grid-area:controls; display:flex; flex-direction:column; gap:12px; }
+  .plan{ border-left:4px solid; }
+  .plan-a{ border-left-color:var(--a); }
+  .plan-b{ border-left-color:var(--b); }
+  .plan h3{ margin:0 0 10px; font-size:17px; display:flex; align-items:baseline; gap:8px; }
+  .plan-a h3{ color:var(--a); } .plan-b h3{ color:var(--b); }
+  .plan h3 .f{ font-size:13px; color:var(--dim); font-weight:500; font-variant-numeric:tabular-nums; }
+  .row{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin:9px 0 3px; font-size:13px; }
+  .row b{ font-weight:600; color:var(--text); }
+  .row output{ font-variant-numeric:tabular-nums; font-weight:700; font-size:15px; }
+  input[type=range]{
+    width:100%; height:34px; margin:0; -webkit-appearance:none; appearance:none; background:transparent;
+    touch-action:pan-y;
+  }
+  input[type=range]::-webkit-slider-runnable-track{ height:6px; border-radius:3px; background:var(--line); }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:26px; height:26px; margin-top:-10px; border-radius:50%;
+    background:var(--sand); border:3px solid var(--deep); box-shadow:0 2px 6px rgba(0,0,0,.4);
+  }
+  .plan-a input[type=range]::-webkit-slider-thumb{ background:var(--a); }
+  .plan-b input[type=range]::-webkit-slider-thumb{ background:var(--b); }
+  input[type=range]::-moz-range-track{ height:6px; border-radius:3px; background:var(--line); }
+  input[type=range]::-moz-range-thumb{ width:26px; height:26px; border-radius:50%; background:var(--sand); border:3px solid var(--deep); }
+
+  .me{ border-left:4px solid var(--sand); }
+  .me h3{ margin:0 0 8px; font-size:15px; color:var(--sand); }
+  .me .in{ display:flex; align-items:center; gap:8px; }
+  .me input[type=number]{
+    font:inherit; font-size:18px; font-weight:700; width:84px; text-align:center;
+    background:rgba(0,0,0,.25); color:var(--text); border:1px solid var(--line); border-radius:9px; padding:7px 6px;
+  }
+  .me .verdict{ margin-top:10px; font-size:13.5px; line-height:1.55; color:var(--text); }
+  .me .verdict b{ font-weight:700; }
+
+  /* ---------- graph ---------- */
+  .graph{ grid-area:graph; display:flex; flex-direction:column; gap:10px; }
+  .graph svg{ width:100%; height:auto; display:block; }
+  .status{
+    font-size:14px; line-height:1.55; padding:10px 13px; border-radius:11px;
+    background:rgba(0,0,0,.22); border:1px solid var(--line);
+  }
+  .status b{ font-weight:700; }
+  .status.meet b{ color:var(--win); }
+  .status.parallel b{ color:var(--bad); }
+  .status.same b{ color:var(--sand); }
+
+  /* ---------- table ---------- */
+  .tablecard{ grid-area:table; overflow-x:auto; }
+  table{ border-collapse:collapse; width:100%; font-variant-numeric:tabular-nums; font-size:13.5px; }
+  th,td{ padding:8px 6px; text-align:right; border-bottom:1px solid rgba(44,90,112,.6); white-space:nowrap; }
+  th{ color:var(--dim); font-weight:600; text-align:right; }
+  td:first-child, th:first-child{ text-align:left; color:var(--dim); }
+  td.a-cheap{ background:var(--a-soft); color:#FFD9A8; }
+  td.b-cheap{ background:var(--b-soft); color:#CDEBFA; }
+  td.tie{ background:rgba(79,209,165,.14); color:#BFF1DF; }
+  tr.me-row td{ outline:2px solid var(--sand); outline-offset:-2px; }
+  .legend{ display:flex; gap:14px; font-size:12px; color:var(--dim); margin-top:8px; flex-wrap:wrap; }
+  .legend span::before{ content:""; display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:6px; vertical-align:-2px; }
+  .legend .la::before{ background:var(--a-soft); border:1px solid var(--a); }
+  .legend .lb::before{ background:var(--b-soft); border:1px solid var(--b); }
+  .legend .lt::before{ background:rgba(79,209,165,.14); border:1px solid var(--win); }
+
+  /* ---------- solve ---------- */
+  .solve{ grid-area:solve; }
+  .solve .steps{ display:none; }
+  .solve.open .steps{ display:block; }
+  .solve .hidden-note{ color:var(--dim); font-size:13.5px; }
+  .solve.open .hidden-note{ display:none; }
+  .eqline{
+    font-family:ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size:clamp(15px,2.2vw,18px); padding:7px 0; display:flex; gap:12px; align-items:baseline; flex-wrap:wrap;
+  }
+  .eqline .why{ font-family:inherit; font-size:12.5px; color:var(--dim); }
+  .eqline .ca{ color:var(--a); } .eqline .cb{ color:var(--b); }
+  .conclusion{ margin-top:10px; padding:11px 14px; border-radius:11px; background:rgba(0,0,0,.22); border:1px solid var(--line); font-size:14.5px; line-height:1.6; }
+  .conclusion b{ color:var(--win); }
+
+  /* ---------- asks ---------- */
+  .asks{ grid-area:asks; }
+  .asks ol{ margin:0; padding-left:20px; font-size:14px; line-height:1.7; color:var(--text); }
+  .asks li{ margin:4px 0; }
+  .asks li b{ color:var(--sand); font-weight:600; }
+
+  @media (prefers-reduced-motion:reduce){ *{ transition:none !important; } }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <h1>몇 분부터 B사가 유리할까<small>두 요금제 대결</small></h1>
+  <div class="spacer"></div>
+  <button id="stepBtn" aria-pressed="false">실제 과금(1분 올림) 보기</button>
+  <button id="solveBtn" aria-pressed="false">식 풀이 보기</button>
+  <button id="resetBtn">처음 값으로</button>
+</header>
+
+<main class="wrap">
+
+  <section class="controls">
+    <div class="card plan plan-a">
+      <h3>A사 <span class="f" id="fA"></span></h3>
+      <div class="row"><b>잠금해제 기본요금</b><output id="oA0"></output></div>
+      <input type="range" id="A0" min="0" max="5000" step="100">
+      <div class="row"><b>분당 요금</b><output id="oA1"></output></div>
+      <input type="range" id="A1" min="0" max="400" step="10">
+    </div>
+
+    <div class="card plan plan-b">
+      <h3>B사 <span class="f" id="fB"></span></h3>
+      <div class="row"><b>잠금해제 기본요금</b><output id="oB0"></output></div>
+      <input type="range" id="B0" min="0" max="5000" step="100">
+      <div class="row"><b>분당 요금</b><output id="oB1"></output></div>
+      <input type="range" id="B1" min="0" max="400" step="10">
+    </div>
+
+    <div class="card me">
+      <h3>내 통학 시간</h3>
+      <div class="in"><input type="number" id="me" min="0" max="200" step="1" value="12"><span>분</span></div>
+      <div class="verdict" id="verdict"></div>
+    </div>
+  </section>
+
+  <section class="graph">
+    <div class="card">
+      <svg id="chart" viewBox="0 0 720 440" role="img" aria-label="두 요금제의 요금 그래프"></svg>
+    </div>
+    <div class="status" id="status"></div>
+  </section>
+
+  <section class="card tablecard">
+    <h2>표로 보기</h2>
+    <table id="tbl"></table>
+    <div class="legend"><span class="la">A사가 싸다</span><span class="lb">B사가 싸다</span><span class="lt">같다</span></div>
+  </section>
+
+  <section class="card solve" id="solve">
+    <h2>식으로 보기</h2>
+    <div class="hidden-note">먼저 표와 그래프에서 답을 찾아본 뒤, 위의 "식 풀이 보기"를 눌러 확인하세요.</div>
+    <div class="steps" id="steps"></div>
+  </section>
+
+  <section class="card asks">
+    <h2>생각해 볼 것</h2>
+    <ol>
+      <li>표에서 한 칸 오른쪽으로 갈 때마다 A는 얼마씩, B는 얼마씩 늘어나나? 그 숫자가 요금표의 <b>어디</b>에 있나?</li>
+      <li>두 직선이 세로축과 만나는 높이는 무엇을 뜻하나?</li>
+      <li>교점의 왼쪽과 오른쪽에서 <b>아래에 있는 직선</b>이 바뀐다. "아래에 있다"는 게 현실에서 무슨 뜻인가?</li>
+      <li>두 회사의 <b>분당 요금을 똑같이</b> 맞춰보라. 교점이 어떻게 되나? 그때 식 풀이는 어떻게 되나?</li>
+      <li>"25분에 같아진다"와 "26분부터 B가 싸다"는 다른 말이다. 왜?</li>
+      <li>"실제 과금"을 켜보라. 직선과 계단 중 어느 쪽이 진짜인가? 그럼 직선은 <b>틀린</b> 것인가?</li>
+    </ol>
+  </section>
+
+</main>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const won = n => Math.round(n).toLocaleString("ko-KR") + "원";
+const DEFAULT = { A0:500, A1:180, B0:2000, B1:120, me:12 };
+
+let stepMode = false;
+
+function read(){
+  return {
+    bA: +$("A0").value, mA: +$("A1").value,
+    bB: +$("B0").value, mB: +$("B1").value,
+    me: Math.max(0, Math.min(200, +$("me").value || 0))
+  };
+}
+const fareLine = (m, b, t) => m * t + b;
+const fareStep = (m, b, t) => m * Math.ceil(t - 1e-9) + b;   // 1분 미만 올림
+const fare = (m, b, t) => stepMode ? fareStep(m, b, t) : fareLine(m, b, t);
+
+function formula(m, b){
+  const bs = b === 0 ? "" : (b > 0 ? ` + ${b}` : ` − ${Math.abs(b)}`);
+  return `y = ${m}x${bs}`;
+}
+
+/* 교점 분석 — 세 가지 경우를 모두 다룬다 */
+function analyze(s){
+  const dm = s.mA - s.mB, db = s.bB - s.bA;
+  if(dm === 0 && db === 0) return { kind:"same" };
+  if(dm === 0) return { kind:"parallel", gap:Math.abs(db), pricier: s.bA > s.bB ? "A" : "B" };
+  const x = db / dm, y = fareLine(s.mA, s.bA, x);
+  const cheapAfter = s.mA < s.mB ? "A" : "B";      // 기울기가 작은 쪽이 결국 싸진다
+  return { kind:"meet", x, y, cheapAfter, cheapBefore: cheapAfter === "A" ? "B" : "A" };
+}
+
+/* ---------- 그래프 ---------- */
+function niceMax(v){
+  if(v <= 0) return 1000;
+  const p = Math.pow(10, Math.floor(Math.log10(v)));
+  const n = v / p;
+  const m = n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10;
+  return m * p;
+}
+function drawChart(s, an){
+  const svg = $("chart");
+  const W = 720, H = 440, L = 66, R = 22, T = 26, B = 46;
+  const pw = W - L - R, ph = H - T - B;
+
+  let xMax = 40;
+  if(an.kind === "meet" && an.x > 0) xMax = Math.max(40, Math.min(200, Math.ceil(an.x / 10) * 10 + 10));
+  const yRaw = Math.max(fareLine(s.mA, s.bA, xMax), fareLine(s.mB, s.bB, xMax), s.bA, s.bB, 1);
+  const yMax = niceMax(yRaw * 1.08);
+  const X = t => L + (t / xMax) * pw;
+  const Y = v => T + ph - (v / yMax) * ph;
+
+  let out = "";
+  // 어느 회사가 싼 구간인지 바탕색으로
+  if(an.kind === "meet" && an.x > 0 && an.x < xMax){
+    out += `<rect x="${X(0)}" y="${T}" width="${X(an.x) - X(0)}" height="${ph}" fill="var(--${an.cheapBefore.toLowerCase()}-soft)"/>`;
+    out += `<rect x="${X(an.x)}" y="${T}" width="${X(xMax) - X(an.x)}" height="${ph}" fill="var(--${an.cheapAfter.toLowerCase()}-soft)"/>`;
+  } else if(an.kind === "parallel"){
+    const cheap = an.pricier === "A" ? "b" : "a";
+    out += `<rect x="${X(0)}" y="${T}" width="${pw}" height="${ph}" fill="var(--${cheap}-soft)"/>`;
+  }
+
+  // 격자와 눈금
+  const xStep = xMax <= 60 ? 5 : xMax <= 120 ? 10 : 20;
+  for(let t = 0; t <= xMax; t += xStep){
+    out += `<line x1="${X(t)}" y1="${T}" x2="${X(t)}" y2="${T+ph}" stroke="rgba(255,255,255,.06)"/>`;
+    out += `<text x="${X(t)}" y="${T+ph+18}" fill="var(--dim)" font-size="12" text-anchor="middle">${t}</text>`;
+  }
+  const yTick = yMax / 5;
+  for(let v = 0; v <= yMax + 1e-9; v += yTick){
+    out += `<line x1="${L}" y1="${Y(v)}" x2="${L+pw}" y2="${Y(v)}" stroke="rgba(255,255,255,.06)"/>`;
+    out += `<text x="${L-8}" y="${Y(v)+4}" fill="var(--dim)" font-size="12" text-anchor="end">${Math.round(v).toLocaleString("ko-KR")}</text>`;
+  }
+  out += `<line x1="${L}" y1="${T}" x2="${L}" y2="${T+ph}" stroke="var(--line)" stroke-width="1.5"/>`;
+  out += `<line x1="${L}" y1="${T+ph}" x2="${L+pw}" y2="${T+ph}" stroke="var(--line)" stroke-width="1.5"/>`;
+  out += `<text x="${L+pw}" y="${T+ph+36}" fill="var(--dim)" font-size="12" text-anchor="end">시간(분)</text>`;
+  out += `<text x="${L-8}" y="${T-10}" fill="var(--dim)" font-size="12" text-anchor="end">요금(원)</text>`;
+
+  // 두 요금제
+  const plot = (m, b, color) => {
+    if(!stepMode){
+      return `<line x1="${X(0)}" y1="${Y(b)}" x2="${X(xMax)}" y2="${Y(fareLine(m,b,xMax))}" stroke="${color}" stroke-width="3" stroke-linecap="round"/>`;
+    }
+    let d = `M ${X(0)} ${Y(b)}`;
+    for(let k = 1; k <= xMax; k++){
+      const v = fareLine(m, b, k);
+      d += ` L ${X(k-1)} ${Y(v)} L ${X(k)} ${Y(v)}`;
+    }
+    return `<path d="${d}" fill="none" stroke="${color}" stroke-width="2.4" stroke-linejoin="round"/>`;
+  };
+  out += plot(s.mA, s.bA, "var(--a)");
+  out += plot(s.mB, s.bB, "var(--b)");
+
+  // y절편 = 기본요금
+  out += `<circle cx="${X(0)}" cy="${Y(s.bA)}" r="5" fill="var(--a)" stroke="var(--abyss)" stroke-width="2"/>`;
+  out += `<circle cx="${X(0)}" cy="${Y(s.bB)}" r="5" fill="var(--b)" stroke="var(--abyss)" stroke-width="2"/>`;
+
+  // 내 통학 시간
+  if(s.me > 0 && s.me <= xMax){
+    out += `<line x1="${X(s.me)}" y1="${T}" x2="${X(s.me)}" y2="${T+ph}" stroke="var(--sand)" stroke-dasharray="3 5" stroke-width="1.5"/>`;
+    out += `<text x="${X(s.me)}" y="${T+ph-6}" fill="var(--sand)" font-size="12" text-anchor="middle">나 ${s.me}분</text>`;
+  }
+
+  // 교점
+  if(an.kind === "meet" && an.x >= 0 && an.x <= xMax){
+    out += `<line x1="${X(an.x)}" y1="${Y(an.y)}" x2="${X(an.x)}" y2="${T+ph}" stroke="var(--win)" stroke-dasharray="4 4" stroke-width="1.5"/>`;
+    out += `<circle cx="${X(an.x)}" cy="${Y(an.y)}" r="7" fill="var(--win)" stroke="var(--abyss)" stroke-width="2.5"/>`;
+    const lx = X(an.x) + (an.x > xMax * 0.7 ? -12 : 12);
+    const anchor = an.x > xMax * 0.7 ? "end" : "start";
+    const xs = Number.isInteger(an.x) ? an.x : an.x.toFixed(1);
+    out += `<text x="${lx}" y="${Y(an.y)-12}" fill="var(--win)" font-size="13" font-weight="700" text-anchor="${anchor}">(${xs}분, ${won(an.y)})</text>`;
+  }
+
+  // 범례
+  out += `<line x1="${L+14}" y1="${T+4}" x2="${L+40}" y2="${T+4}" stroke="var(--a)" stroke-width="3"/><text x="${L+46}" y="${T+8}" fill="var(--a)" font-size="12" font-weight="600">A사</text>`;
+  out += `<line x1="${L+92}" y1="${T+4}" x2="${L+118}" y2="${T+4}" stroke="var(--b)" stroke-width="3"/><text x="${L+124}" y="${T+8}" fill="var(--b)" font-size="12" font-weight="600">B사</text>`;
+
+  svg.innerHTML = out;
+  return xMax;
+}
+
+/* ---------- 상태 메시지 ---------- */
+function drawStatus(s, an){
+  const el = $("status");
+  el.className = "status " + an.kind;
+  if(an.kind === "same"){
+    el.innerHTML = `두 요금제가 <b>완전히 같다.</b> 몇 분을 타든 요금이 같아서, 두 직선이 포개진다. 식으로 풀면 해가 <b>무수히 많다</b>.`;
+    return;
+  }
+  if(an.kind === "parallel"){
+    const p = an.pricier, c = p === "A" ? "B" : "A";
+    el.innerHTML = `분당 요금이 같아서 두 직선이 <b>평행</b>하다. 영원히 만나지 않고, <b>${p}사가 항상 ${won(an.gap)} 더 비싸다.</b> 식으로 풀면 해가 <b>없다</b> — "답을 못 구했다"가 아니라 "같아지는 순간이 없다"는 뜻이다.`;
+    return;
+  }
+  const xs = Number.isInteger(an.x) ? `${an.x}분` : `${an.x.toFixed(1)}분`;
+  if(an.x <= 0){
+    el.innerHTML = `교점이 0분 이전(${xs})에 있다. 즉 <b>처음부터 끝까지 ${an.cheapAfter}사가 싸다.</b>`;
+    return;
+  }
+  const from = Math.floor(an.x) + 1;
+  el.innerHTML = `<b>${xs}</b>에 두 요금이 <b>${won(an.y)}</b>으로 같아진다. 그 전에는 ${an.cheapBefore}사가, 그 후에는 ${an.cheapAfter}사가 싸다. 분 단위로 타면 <b>${from}분부터 ${an.cheapAfter}사가 유리</b>하다.`;
+}
+
+/* ---------- 표 ---------- */
+function drawTable(s, an, xMax){
+  const step = xMax <= 60 ? 5 : 10;
+  const times = [];
+  for(let t = 0; t <= xMax; t += step) times.push(t);
+  if(s.me > 0 && !times.includes(s.me) && s.me <= xMax){ times.push(s.me); times.sort((a,b)=>a-b); }
+
+  const cls = (fa, fb) => fa < fb ? "a-cheap" : fb < fa ? "b-cheap" : "tie";
+  let h = `<thead><tr><th>시간(분)</th>${times.map(t => `<th>${t}</th>`).join("")}</tr></thead><tbody>`;
+  h += `<tr><td>A사</td>${times.map(t => { const fa = fare(s.mA,s.bA,t), fb = fare(s.mB,s.bB,t); return `<td class="${cls(fa,fb)==="a-cheap"?"a-cheap":""}">${won(fa)}</td>`; }).join("")}</tr>`;
+  h += `<tr><td>B사</td>${times.map(t => { const fa = fare(s.mA,s.bA,t), fb = fare(s.mB,s.bB,t); return `<td class="${cls(fa,fb)==="b-cheap"?"b-cheap":""}">${won(fb)}</td>`; }).join("")}</tr>`;
+  h += `<tr><td>더 싼 곳</td>${times.map(t => { const fa = fare(s.mA,s.bA,t), fb = fare(s.mB,s.bB,t); const c = cls(fa,fb); return `<td class="${c}">${c==="tie"?"같다":c==="a-cheap"?"A":"B"}</td>`; }).join("")}</tr>`;
+  h += `</tbody>`;
+  $("tbl").innerHTML = h;
+}
+
+/* ---------- 식 풀이 ---------- */
+function drawSteps(s, an){
+  const A = `<span class="ca">${s.mA}x + ${s.bA}</span>`;
+  const Bm = `<span class="cb">${s.mB}x + ${s.bB}</span>`;
+  const dm = s.mA - s.mB, db = s.bB - s.bA;
+  let h = `<div class="eqline">${A} = ${Bm}<span class="why">두 요금이 같아지는 순간</span></div>`;
+  h += `<div class="eqline">${s.mA}x − ${s.mB}x = ${s.bB} − ${s.bA}<span class="why">x는 왼쪽으로, 숫자는 오른쪽으로 — 양변에서 같은 것을 빼서</span></div>`;
+
+  if(dm === 0 && db === 0){
+    h += `<div class="eqline">0 = 0<span class="why">항상 참</span></div>`;
+    h += `<div class="conclusion">x가 무엇이든 성립한다 → 해가 <b>무수히 많다</b>. 두 회사는 사실 같은 요금제다.</div>`;
+  } else if(dm === 0){
+    h += `<div class="eqline">0 = ${db}<span class="why">거짓</span></div>`;
+    h += `<div class="conclusion">어떤 x로도 성립하지 않는다 → 해가 <b>없다</b>. 두 직선은 평행하고, 요금 차이 ${won(Math.abs(db))}은 영원히 좁혀지지 않는다.</div>`;
+  } else {
+    h += `<div class="eqline">${dm}x = ${db}</div>`;
+    const xs = Number.isInteger(an.x) ? an.x : an.x.toFixed(2);
+    h += `<div class="eqline">x = ${db} ÷ ${dm} = <b>${xs}</b><span class="why">${dm < 0 ? "음수로 나눴다 — 부호가 바뀌는 것에 주의" : ""}</span></div>`;
+    if(an.x > 0){
+      const from = Math.floor(an.x) + 1;
+      h += `<div class="conclusion"><b>${xs}분</b>에 ${won(an.y)}으로 같아진다. 그러니 <b>${from}분부터</b> ${an.cheapAfter}사가 유리하다. ${Number.isInteger(an.x) ? `${an.x}분 <u>에</u>는 같고, ${from}분 <u>부터</u> 싸다 — "같다"와 "싸다"는 다른 말이다.` : `${xs}분은 정수가 아니므로 그 다음 정수 분인 ${from}분부터다.`}</div>`;
+    } else {
+      h += `<div class="conclusion">교점이 ${xs}분 — 0분 이전이다. 손님이 타기 시작하는 순간부터 이미 <b>${an.cheapAfter}사가 싸다</b>.</div>`;
+    }
+  }
+  $("steps").innerHTML = h;
+}
+
+/* ---------- 내 통학 ---------- */
+function drawVerdict(s){
+  const el = $("verdict");
+  if(s.me <= 0){ el.textContent = "통학 시간을 넣어보세요."; return; }
+  const fa = fare(s.mA, s.bA, s.me), fb = fare(s.mB, s.bB, s.me);
+  if(fa === fb){ el.innerHTML = `${s.me}분이면 두 회사 모두 <b>${won(fa)}</b>. 어디를 타도 같다.`; return; }
+  const c = fa < fb ? "A" : "B";
+  el.innerHTML = `${s.me}분이면 A사 ${won(fa)}, B사 ${won(fb)}.<br><b>${c}사가 ${won(Math.abs(fa-fb))} 더 싸다.</b>`;
+}
+
+/* ---------- 전체 갱신 ---------- */
+function update(){
+  const s = read();
+  $("oA0").textContent = won(s.bA); $("oA1").textContent = won(s.mA);
+  $("oB0").textContent = won(s.bB); $("oB1").textContent = won(s.mB);
+  $("fA").textContent = formula(s.mA, s.bA);
+  $("fB").textContent = formula(s.mB, s.bB);
+  const an = analyze(s);
+  const xMax = drawChart(s, an);
+  drawStatus(s, an);
+  drawTable(s, an, xMax);
+  drawSteps(s, an);
+  drawVerdict(s);
+}
+
+function reset(){
+  $("A0").value = DEFAULT.A0; $("A1").value = DEFAULT.A1;
+  $("B0").value = DEFAULT.B0; $("B1").value = DEFAULT.B1;
+  $("me").value = DEFAULT.me;
+  update();
+}
+
+["A0","A1","B0","B1"].forEach(id => $(id).addEventListener("input", update));
+$("me").addEventListener("input", update);
+$("resetBtn").addEventListener("click", reset);
+$("stepBtn").addEventListener("click", () => {
+  stepMode = !stepMode;
+  $("stepBtn").setAttribute("aria-pressed", String(stepMode));
+  update();
+});
+$("solveBtn").addEventListener("click", () => {
+  const open = $("solve").classList.toggle("open");
+  $("solveBtn").setAttribute("aria-pressed", String(open));
+  if(open) $("solve").scrollIntoView({ behavior:"smooth", block:"nearest" });
+});
+
+reset();
+</script>
+</body>
+</html>
