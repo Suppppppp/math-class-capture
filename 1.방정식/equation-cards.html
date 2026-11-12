@@ -1,0 +1,1590 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>상자를 혼자 남겨라</title>
+<style>
+  :root{
+    --abyss:#0A1C26;
+    --deep:#102B39;
+    --panel:#16374A;
+    --panel-2:#1D465B;
+    --line:#2C5A70;
+    --sand:#EFE4CB;
+    --text:#D9E8EE;
+    --dim:#7BA0B1;
+    --win:#4FD1A5;
+    --warn:#F2A03D;
+    --bad:#F27A7A;
+    --card:clamp(52px, 8.2vw, 74px);
+    --gap:clamp(6px, 1.2vw, 12px);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(120% 80% at 50% -10%, #17435A 0%, var(--abyss) 62%);
+    color:var(--text);
+    font-family:-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", system-ui, sans-serif;
+    display:flex; flex-direction:column;
+    overflow:hidden;
+    touch-action:manipulation;
+    padding-top:env(safe-area-inset-top);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+
+  /* ---------- top bar ---------- */
+  .bar{
+    display:flex; align-items:center; gap:14px;
+    padding:10px clamp(12px,3vw,28px);
+    border-bottom:1px solid var(--line);
+    flex:0 0 auto;
+  }
+  .stage{
+    font-size:15px; font-weight:700; letter-spacing:-.01em;
+  }
+  .stage small{ color:var(--dim); font-weight:500; margin-left:6px; }
+  .pips{ display:flex; gap:5px; margin-left:4px; }
+  .pip{ width:7px; height:7px; border-radius:50%; background:var(--line); }
+  .pip.done{ background:var(--win); }
+  .pip.now{ background:var(--warn); transform:scale(1.35); }
+  .moves{
+    font-variant-numeric:tabular-nums; font-weight:700; font-size:15px;
+    padding:4px 13px; border-radius:999px;
+    background:rgba(79,209,165,.12); border:1px solid rgba(79,209,165,.45); color:var(--win);
+    transition:transform .15s;
+  }
+  .moves small{ font-weight:500; font-size:12px; color:var(--dim); margin-left:1px; }
+  .moves.bump{ transform:scale(1.18); }
+  .moves.over{ background:rgba(242,160,61,.12); border-color:rgba(242,160,61,.45); color:var(--warn); }
+  .bar .spacer{ flex:1; }
+  button{
+    font:inherit; color:inherit; cursor:pointer;
+    background:transparent; border:1px solid var(--line);
+    border-radius:9px; padding:7px 12px;
+    transition:background .15s, border-color .15s;
+  }
+  button:hover{ background:var(--panel); }
+  button:focus-visible{ outline:2px solid var(--warn); outline-offset:2px; }
+  button[disabled]{ opacity:.35; cursor:default; }
+  .ghostbtn{ font-size:13px; color:var(--dim); border-color:transparent; padding:7px 9px; }
+  .ghostbtn:hover{ color:var(--text); background:var(--panel); }
+
+  /* ---------- board ---------- */
+  .board{
+    flex:1 1 auto; min-height:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:clamp(10px,2vh,22px);
+    padding:clamp(8px,2vh,20px) clamp(10px,3vw,28px);
+    position:relative;
+  }
+  .goal{
+    font-size:13px; color:var(--dim); text-align:center; line-height:1.5;
+    min-height:2.9em; display:flex; align-items:center; justify-content:center;
+    padding:0 8px; transition:color .2s;
+  }
+  .goal b{ color:var(--sand); font-weight:600; }
+  .goal.speak{ color:var(--text); }
+  .goal.speak b{ color:var(--warn); }
+
+  .scale{
+    display:flex; align-items:center; justify-content:center;
+    gap:clamp(8px,2.4vw,26px);
+    width:100%;
+  }
+  .pan{
+    flex:1 1 0; min-width:0;
+    background:linear-gradient(180deg, var(--panel) 0%, rgba(16,43,57,.55) 100%);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:clamp(10px,1.8vh,18px) clamp(8px,1.6vw,16px);
+    min-height:calc(var(--card) + 40px);
+    display:flex; flex-wrap:wrap; align-items:center; justify-content:center;
+    gap:2px var(--gap);
+    transition:border-color .2s, box-shadow .2s;
+  }
+  .pan.flash{ border-color:var(--warn); box-shadow:0 0 0 3px rgba(242,160,61,.16); }
+  .pan.solved{ border-color:var(--win); box-shadow:0 0 0 3px rgba(79,209,165,.16); }
+  .pan.near{ border-color:var(--warn); box-shadow:0 0 0 3px rgba(242,160,61,.14); }
+  .pan.near .term, .pan.solved .term{ animation:none; }
+  .eq{
+    font-size:clamp(26px,5vw,40px); font-weight:300; color:var(--dim);
+    flex:0 0 auto; padding:0 2px;
+  }
+
+  /* ---------- terms ---------- */
+  .op{ font-size:clamp(20px,3.4vw,27px); color:var(--dim); font-weight:400; padding:0 1px; }
+  .term{
+    display:flex; align-items:center; gap:3px; position:relative;
+    padding:5px; border-radius:12px; border:2px solid transparent;
+    cursor:pointer; transition:transform .12s, border-color .12s, background .12s;
+  }
+  .term:hover{ background:rgba(255,255,255,.04); }
+  .term.mates{ border-color:rgba(79,209,165,.5); }
+  .term.shake{ animation:shake .3s; }
+  @keyframes shake{ 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
+  .term.in{ animation:drop .35s cubic-bezier(.2,1.3,.4,1); }
+  @keyframes drop{ from{ transform:translateY(-22px) scale(.8); opacity:0 } to{ transform:none; opacity:1 } }
+  .term.out{ animation:poof .3s forwards; pointer-events:none; }
+  .term.out-late{ animation:poof .32s .14s forwards; pointer-events:none; }
+  .term.suck{ animation:suck .42s cubic-bezier(.4,0,.6,1) forwards; pointer-events:none; z-index:2; }
+  @keyframes suck{ to{ transform:translate(var(--dx,0), var(--dy,0)) scale(.35); opacity:0 } }
+  .term.absorb{ animation:absorb .5s .18s ease-out; }
+  @keyframes absorb{ 0%{ transform:scale(1) } 35%{ transform:scale(1.14) } 100%{ transform:scale(1) } }
+  .c.flip{ animation:flipcard .34s ease-in-out both; }
+  @keyframes flipcard{ 0%{ transform:rotateY(0) } 50%{ transform:rotateY(90deg) } 100%{ transform:rotateY(0) } }
+  /* 분모·계수로 들어온 카드가 자리 잡고, 짝과 함께 지워지는 과정 */
+  .c.land{ animation:land .3s cubic-bezier(.2,1.3,.4,1) both; }
+  @keyframes land{ from{ transform:translateY(-16px) scale(.7); opacity:0 } to{ transform:none; opacity:1 } }
+  .c.cancel{ animation:cancel .46s .3s ease-in forwards; }
+  .c.cancel::before{
+    content:""; position:absolute; left:10%; right:10%; top:50%; height:3px;
+    background:var(--bad, #F27A7A); border-radius:2px; transform:rotate(-22deg) scaleX(0);
+    transform-origin:center; animation:strike .22s .22s ease-out forwards;
+  }
+  @keyframes strike{ to{ transform:rotate(-22deg) scaleX(1) } }
+  @keyframes cancel{ 60%{ opacity:1; transform:scale(1) } 100%{ opacity:0; transform:scale(.4) rotate(10deg) } }
+  .eq{ transition:color .25s, transform .25s; }
+  .eq.broken{ transform:scale(1.18); }
+  @keyframes poof{ to{ transform:scale(.3) rotate(8deg); opacity:0 } }
+
+  .dot{ font-size:calc(var(--card) * .42); line-height:1; color:var(--dim); padding:0 1px; user-select:none; }
+  .frac{ display:flex; flex-direction:column; align-items:center; gap:3px; }
+  .frac .bar-line{ width:100%; height:2px; background:var(--dim); border-radius:2px; }
+  .row{ display:flex; align-items:center; gap:3px; }
+
+  /* ---------- cards ---------- */
+  .c{
+    width:var(--card); height:var(--card);
+    border-radius:14px; position:relative;
+    display:flex; align-items:center; justify-content:center;
+    flex:0 0 auto;
+    border:1.5px solid rgba(0,0,0,.28);
+    box-shadow:inset 0 -3px 0 rgba(0,0,0,.18);
+  }
+  .c svg{ width:62%; height:62%; display:block; }
+  .c .num{
+    font-size:calc(var(--card) * .42); font-weight:700; letter-spacing:-.03em;
+  }
+  .c .tag{
+    position:absolute; right:5px; bottom:3px;
+    font-size:calc(var(--card) * .22); font-weight:700; opacity:.92;
+  }
+  .c.night::after{
+    content:""; position:absolute; inset:0; border-radius:inherit;
+    background-image:
+      radial-gradient(1.5px 1.5px at 22% 26%, rgba(255,255,255,.75), transparent),
+      radial-gradient(1.5px 1.5px at 72% 40%, rgba(255,255,255,.55), transparent),
+      radial-gradient(1.5px 1.5px at 46% 74%, rgba(255,255,255,.6), transparent);
+    pointer-events:none;
+  }
+  .c.minus1{
+    background:linear-gradient(165deg,#3A5466,#21394a);
+    color:#FFC27A; border-color:rgba(255,194,122,.4);
+  }
+  .c.minus1 .num{ font-size:calc(var(--card) * .38); }
+  .paren{
+    font-size:calc(var(--card) * .95); line-height:.9; font-weight:200;
+    color:var(--dim); padding:0 1px; user-select:none;
+  }
+  .group{ display:flex; align-items:center; gap:3px; }
+  .group .inner{ display:flex; align-items:center; gap:3px; padding:0 2px; }
+  .group.grabbable{ border-radius:12px; padding:2px; cursor:grab;
+    background:rgba(242,160,61,.07); outline:1px dashed rgba(242,160,61,.35); }
+  .group.grabbable:active{ cursor:grabbing; }
+  .group.asDiv{ outline:none; background:none; }
+  .group.asDiv .paren{ font-size:calc(var(--card) * .8); }
+  .term.grouped{ border-color:rgba(242,160,61,.3); }
+  .sub{ display:flex; align-items:center; gap:3px; pointer-events:none; }
+  .c.neg{
+    background:linear-gradient(165deg,#3C5A6B,#223D4C);
+    color:var(--warn);
+    border-color:rgba(242,160,61,.45);
+  }
+  .c.neg .num{ font-size:calc(var(--card) * .36); letter-spacing:-.04em; }
+  .slot.tool{ margin-left:clamp(6px,2vw,18px); padding-left:clamp(6px,2vw,18px); border-left:1px solid var(--line); }
+  .c.box{
+    background:linear-gradient(165deg,#F6EEDC,#D9C9A6);
+    color:#2A2118;
+  }
+  .c.box .lid{ position:absolute; top:26%; left:8%; right:8%; height:2px; background:rgba(42,33,24,.3); }
+
+  /* ---------- tray ---------- */
+  .tray{
+    flex:0 0 auto;
+    border-top:1px solid var(--line);
+    background:linear-gradient(180deg, rgba(10,28,38,0) 0%, rgba(8,24,33,.75) 100%);
+    padding:clamp(8px,1.6vh,14px) clamp(12px,3vw,28px) clamp(10px,2vh,18px);
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .legend{
+    display:flex; flex-wrap:wrap; gap:4px 18px;
+    font-size:12.5px; color:var(--dim); line-height:1.5;
+  }
+  .legend b{ color:var(--text); font-weight:600; }
+
+  /* ---------- 빈 자리 · 깨진 등호 ---------- */
+  .eq.broken{ color:var(--warn); font-weight:600; }
+  .c.drop{
+    border:2px dashed var(--warn);
+    background:rgba(242,160,61,.09);
+    box-shadow:none;
+    animation:breathe 1.5s ease-in-out infinite;
+  }
+  .c.drop .q{ font-size:calc(var(--card) * .4); font-weight:700; color:var(--warn); }
+  .c.drop.zone-fill{ background:rgba(242,160,61,.32); border-style:solid; animation:none; }
+  @keyframes breathe{ 0%,100%{ opacity:.7 } 50%{ opacity:1 } }
+  .term.waiting{ border-color:rgba(242,160,61,.35); }
+  body.open-eq .pan{ border-color:rgba(242,160,61,.5); }
+
+  /* ---------- 드래그 ---------- */
+  .c, .term{ touch-action:none; }
+  .ghost{ opacity:.92; transform:scale(1.07); filter:drop-shadow(0 8px 18px rgba(0,0,0,.5)); }
+  body.dragging .pan{ border-style:dashed; }
+  .pan.zone{ border-style:solid !important; border-color:var(--warn); box-shadow:0 0 0 3px rgba(242,160,61,.18); }
+  .term.zone-mul{ border-color:var(--warn); background:linear-gradient(180deg, rgba(242,160,61,.22), transparent 60%); }
+  .term.zone-div{ border-color:var(--warn); background:linear-gradient(0deg, rgba(242,160,61,.22), transparent 60%); }
+  .term.zone-merge{ border-color:var(--win); background:rgba(79,209,165,.14); }
+  body.dragging.dragcard .term::before,
+  body.dragging.dragcard .term::after{
+    position:absolute; left:50%; transform:translateX(-50%);
+    font-size:11px; color:var(--dim); pointer-events:none;
+  }
+  body.dragging.dragcard .term::before{ content:"×"; top:-13px; }
+  body.dragging.dragcard .term::after{ content:"÷"; bottom:-13px; }
+
+  .deck{ display:flex; gap:clamp(8px,2vw,16px); align-items:flex-end; flex-wrap:wrap; }
+  .slot{ display:flex; flex-direction:column; gap:5px; align-items:center; }
+  .slot .c{ cursor:pointer; transition:transform .12s; }
+  .slot .c:hover{ transform:translateY(-3px); }
+  .slot .c:active{ transform:translateY(0) scale(.94); }
+  .slot .lbl{ font-size:11px; color:var(--dim); }
+
+  /* ---------- fly animation ---------- */
+  .fly{
+    position:fixed; z-index:40; pointer-events:none;
+    transition:transform .38s cubic-bezier(.3,.9,.3,1), opacity .38s;
+  }
+
+
+  /* ---------- overlay ---------- */
+  /* ---------- 완료 패널 — 덱이 있던 자리에 들어온다. 식은 항상 위에 그대로 ---------- */
+  .veil{ display:none; }
+  .veil.show{ display:block; animation:drop .3s cubic-bezier(.2,1.2,.4,1); }
+  body.reveal .legend, body.reveal .deck{ display:none; }
+  .sheet{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:clamp(16px,2.6vw,24px);
+    max-height:40vh; overflow:auto;
+  }
+  .sheet h2{
+    margin:0 0 6px; font-size:clamp(17px,2.6vw,21px); font-weight:700; letter-spacing:-.02em;
+  }
+  .sheet p{ margin:0 0 11px; font-size:13.5px; line-height:1.6; color:var(--text); }
+  .sheet p.sub{ color:var(--dim); }
+  .log{
+    background:rgba(0,0,0,.24); border:1px solid var(--line);
+    border-radius:10px; padding:10px 12px; margin:0 0 12px;
+    font-size:13px; line-height:1.75;
+  }
+  .log div{ display:flex; gap:10px; }
+  .log .i{ color:var(--dim); width:1.4em; flex:0 0 auto; }
+  .compare{
+    display:grid; grid-template-columns:1fr 1fr; gap:9px; margin:0 0 12px;
+  }
+  .compare div{
+    border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:12.5px; line-height:1.55;
+  }
+  .compare .mine{ border-color:var(--win); }
+  .compare h3{ margin:0 0 6px; font-size:12.5px; color:var(--dim); font-weight:600; }
+  .sheet .go{
+    background:var(--warn); border-color:var(--warn); color:#16110A;
+    font-weight:700; padding:9px 18px; border-radius:10px; font-size:14px;
+  }
+  .sheet .go:hover{ background:#FFB566; }
+  .actions{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+
+  @media (max-width:520px){
+    .compare{ grid-template-columns:1fr; }
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{ animation-duration:.01ms !important; transition-duration:.01ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <div class="stage"><span id="stageName">라운드 A</span><small id="stageSub">그림으로</small></div>
+  <div class="pips" id="pips"></div>
+  <div class="spacer"></div>
+  <div class="moves" id="moves" title="지금까지 둔 수">0<small>/2</small></div>
+  <div class="spacer"></div>
+  <button class="ghostbtn" id="hintBtn">힌트</button>
+  <button class="ghostbtn" id="undoBtn">되돌리기</button>
+  <button class="ghostbtn" id="resetBtn">처음부터</button>
+</div>
+
+<div class="board">
+  <div class="goal" id="goal">상자를 <b>한쪽에 혼자</b> 남기고, 반대쪽에 <b>더 묶을 게 없으면</b> 끝. 카드를 더하면 <b>양쪽에 똑같이</b> 들어간다.</div>
+  <div class="scale">
+    <div class="pan" id="panL"></div>
+    <div class="eq" id="eq">=</div>
+    <div class="pan" id="panR"></div>
+  </div>
+</div>
+
+<div class="tray">
+  <div class="legend">
+    <span><b>빈 곳</b>에 놓기 → 양변에 새 항으로 더해진다</span>
+    <span><b>항의 위쪽</b>에 놓기 → 양변 모든 항에 곱해진다</span>
+    <span><b>항의 아래쪽</b>에 놓기 → 양변 모든 항의 분모로 들어간다</span>
+    <span><b>항을 항 위로</b> 끌기 → 둘이 하나로 묶인다</span>
+    <span><b>항을 톡</b> 치기 → 위아래 같은 카드가 만나 1이 된다</span>
+    <span><b>괄호를 톡</b> 치기 → 밖의 카드가 안의 모든 항에 들어간다</span>
+    <span><b>공통 카드가 있는 두 항</b>을 포개기 → 밖으로 묶여 나온다</span>
+    <span><b>괄호만</b> 집어서 끌기 → 양변을 그 괄호로 나눈다</span>
+  </div>
+  <div class="deck" id="deck"></div>
+  <div class="veil" id="veil"><div class="sheet" id="sheet"></div></div>
+</div>
+
+
+<script>
+"use strict";
+
+/* ============================================================
+   카드 생김새 — 값 1~9가 각각 다른 모양과 색을 갖는다.
+   낮 카드는 밝은 채움, 밤 카드는 가라앉은 어둠 + 별.
+   ============================================================ */
+const HUE = {1:14, 2:196, 3:38, 4:275, 5:160, 6:330, 7:52, 8:220, 9:110};
+// 문자 카드 — 속이 빈 도형. 숫자(꽉 찬 도형)와 한눈에 구별된다.
+const LETTER = { a:{hue:178, sides:6}, b:{hue:22, sides:3}, c:{hue:300, sides:4},
+                 d:{hue:120, sides:5}, f:{hue:48, sides:7}, i:{hue:260, sides:8} };
+const isLetter = k => Object.prototype.hasOwnProperty.call(LETTER, k);
+
+function poly(sides, r){
+  const pts = [];
+  for(let i=0;i<sides;i++){
+    const a = -Math.PI/2 + i*2*Math.PI/sides;
+    pts.push((50 + r*Math.cos(a)).toFixed(1) + "," + (50 + r*Math.sin(a)).toFixed(1));
+  }
+  return pts.join(" ");
+}
+function ringSVG(sides, stroke){
+  return `<svg viewBox="0 0 100 100"><polygon points="${poly(sides, 38)}" fill="none" stroke="${stroke}" stroke-width="11" stroke-linejoin="round"/></svg>`;
+}
+function shapeSVG(v, stroke){
+  if(v === 1) return `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="38" fill="${stroke}"/></svg>`;
+  if(v === 9) return `<svg viewBox="0 0 100 100"><path d="M6 62 Q28 30 50 62 T94 62" fill="none" stroke="${stroke}" stroke-width="13" stroke-linecap="round"/><path d="M6 32 Q28 0 50 32 T94 32" fill="none" stroke="${stroke}" stroke-width="9" stroke-linecap="round" opacity=".55"/></svg>`;
+  return `<svg viewBox="0 0 100 100"><polygon points="${poly(v+2, 40)}" fill="${stroke}"/></svg>`;
+}
+
+/* 카드 하나를 그린다. kind: 'num' | 'box' | 'a' | 'b' | 'c' */
+function cardEl(kind, value, night, skin){
+  const el = document.createElement("div");
+  el.className = "c" + (night ? " night" : "") + (kind === "box" ? " box" : "");
+
+  if(kind === "box"){
+    if(skin === "symbol"){
+      el.innerHTML = `<span class="num">x</span>`;
+    } else {
+      el.innerHTML = `<svg viewBox="0 0 100 100">
+        <rect x="16" y="26" width="68" height="56" rx="6" fill="#C9B489"/>
+        <rect x="10" y="18" width="80" height="16" rx="5" fill="#E3D3AE"/>
+        <polygon points="${poly(5, 15)}" transform="translate(0,12)" fill="#8C7A56"/>
+      </svg>` + (skin === "both" ? `<span class="tag">x</span>` : "");
+    }
+    return el;
+  }
+
+  if(kind === "neg1"){
+    el.classList.add("minus1");
+    el.innerHTML = `<span class="num">−1</span>`;
+    return el;
+  }
+
+  if(isLetter(kind)){
+    const { hue, sides } = LETTER[kind];
+    if(night){
+      el.style.background = `linear-gradient(165deg, hsl(${hue} 34% 20%), hsl(${hue} 40% 11%))`;
+      el.style.color = `hsl(${hue} 48% 74%)`;
+    } else {
+      el.style.background = `linear-gradient(165deg, hsl(${hue} 30% 92%), hsl(${hue} 34% 78%))`;
+      el.style.color = `hsl(${hue} 55% 22%)`;
+    }
+    const ink = night ? `hsl(${hue} 52% 64%)` : `hsl(${hue} 62% 30%)`;
+    if(skin === "symbol"){
+      el.innerHTML = `<span class="num">${kind}</span>`;
+    } else if(skin === "both"){
+      el.innerHTML = ringSVG(sides, ink) + `<span class="tag">${kind}</span>`;
+    } else {
+      el.innerHTML = ringSVG(sides, ink);
+    }
+    return el;
+  }
+
+  const h = HUE[Math.min(9, Math.abs(value))] ?? 200;
+  if(night){
+    el.style.background = `linear-gradient(165deg, hsl(${h} 38% 21%), hsl(${h} 42% 12%))`;
+    el.style.color = `hsl(${h} 45% 72%)`;
+  } else {
+    el.style.background = `linear-gradient(165deg, hsl(${h} 78% 62%), hsl(${h} 72% 47%))`;
+    el.style.color = `hsl(${h} 60% 14%)`;
+  }
+  const ink = night ? `hsl(${h} 50% 62%)` : `hsl(${h} 65% 22%)`;
+
+  if(skin === "symbol"){
+    el.innerHTML = `<span class="num">${Math.abs(value)}</span>`;
+  } else if(skin === "both"){
+    el.innerHTML = shapeSVG(Math.abs(value), ink) + `<span class="tag">${Math.abs(value)}</span>`;
+  } else {
+    el.innerHTML = shapeSVG(Math.abs(value), ink);
+  }
+  return el;
+}
+
+/* ============================================================
+   항(term) 모델
+   n : 부호를 포함한 분자 계수    d : 분모(양수)
+   v : 분자의 기호 카드          vd: 분모의 기호 카드
+   negs : 아직 합쳐지지 않은 (−1) 카드의 개수 — 학생이 직접 합쳐야 사라진다
+   unit : 드러나 있는 1 카드 — (−1)(−1)이 만나 생긴 1
+   g : 괄호 안의 항들. 이 항은 "바깥 계수 × (g의 합)"을 뜻한다
+   gd : 분모에 놓인 괄호 — "이 항 ÷ (gd의 합)"
+   ============================================================ */
+let uid = 1;
+const T = (n, v = [], d = 1, vd = []) => ({ id: uid++, n, d, v: [...v], vd: [...vd] });
+// 괄호 항을 만든다 — 바깥 카드 하나가 안의 모든 항에 걸린다
+const G = (outer, subs) => Object.assign(T(outer.n ?? 1, outer.v ?? [], 1, []), { g: subs });
+const NEG = (count, t) => Object.assign(t, { negs: count });
+const UNIT = t => Object.assign(t, { unit: true });
+const negCount = t => t.negs || 0;
+// 괄호 두 개가 같은 것인지 비교하기 위한 서명
+const termSig = t => `${t.n}|${t.d}|${t.v.join(",")}|${t.vd.join(",")}`;
+const groupSig = subs => subs.map(termSig).sort().join("+");
+// negs·unit을 포함한 실제 부호 (판정용)
+const realSign = t => (negCount(t) % 2 ? -1 : 1);
+
+const gcd = (a, b) => b ? gcd(b, a % b) : Math.abs(a);
+
+function norm(t){
+  if(t.g || t.gd) return t;   // 괄호가 붙은 항은 괄호가 정리될 때까지 손대지 않는다
+  // 분자·분모의 같은 기호 카드를 약분한다 (a/a = 1)
+  for(let i = t.v.length - 1; i >= 0; i--){
+    const j = t.vd.indexOf(t.v[i]);
+    if(j > -1){ t.v.splice(i, 1); t.vd.splice(j, 1); }
+  }
+  if(t.d < 0){ t.d = -t.d; t.n = -t.n; }
+  const g = gcd(t.n, t.d) || 1;
+  if(g > 1){ t.n /= g; t.d /= g; }
+  t.v.sort(); t.vd.sort();
+  return t;
+}
+const isZero = t => t.n === 0;
+// 같은 종류(동류항)인가 — 묶을 수 있는지의 기준
+const sameKind = (a, b) =>
+  !a.g && !b.g && !negCount(a) && !negCount(b) && !a.unit && !b.unit &&
+  (a.gd ? groupSig(a.gd) : "") === (b.gd ? groupSig(b.gd) : "") &&
+  a.d === b.d &&
+  a.v.join("|") === b.v.join("|") &&
+  a.vd.join("|") === b.vd.join("|");
+const isLoneBox = t =>
+  !t.g && !t.gd && !negCount(t) && !t.unit &&
+  t.n === 1 && t.d === 1 && t.v.length === 1 && t.v[0] === "box" && t.vd.length === 0;
+const hasBox = t =>
+  t.v.includes("box") || t.vd.includes("box") ||
+  (t.g ? t.g.some(hasBox) : false) || (t.gd ? t.gd.some(hasBox) : false);
+
+/* ============================================================
+   문제
+   ============================================================ */
+const LEVELS = [
+  // 라운드 A — 숫자가 하나도 없다. 카드는 전부 '어떤 수'.
+  { round:"A", skin:"icon", par:2,
+    L:[T(1,["box"]), T(1,["a"])], R:[T(1,["b"])], deck:["a","b",2],
+    hint:"밝은 카드를 없애려면 같은 모양의 어두운 카드를 양쪽에 더해." },
+  { round:"A", skin:"icon", par:2,
+    L:[T(1,["box"]), T(-1,["a"])], R:[T(1,["c"])], deck:["a","c",3],
+    hint:"어두운 카드를 지우는 건 밝은 카드야." },
+  { round:"A", skin:"icon", par:1,
+    L:[T(1,["b","box"])], R:[T(1,["c"])], deck:["b","c",2],
+    hint:"상자에 카드가 붙어 있어. 양쪽을 그 카드로 나눠봐." },
+
+  // 라운드 B — 같은 카드에 이름이 붙는다. 상자는 x.
+  { round:"B", skin:"both", par:2,
+    L:[T(1,["box"]), T(1,["a"])], R:[T(1,["b"])], deck:["a","b",2],
+    hint:"라운드 A의 첫 문제와 똑같아. 이제 카드의 이름이 보일 뿐이야." },
+  { round:"B", skin:"both", par:3,
+    L:[T(1,["a","box"]), T(1,["b"])], R:[T(1,["c"])], deck:["a","b","c"],
+    hint:"혼자 있는 카드를 먼저 치우고, 상자에 붙은 건 마지막에 나눠." },
+  { round:"B", skin:"both", par:1,
+    L:[T(1,["a","box"])], R:[T(1,["b"]), T(1,["c"])], deck:["a","b","c"],
+    hint:"오른쪽 두 장은 이름이 달라 묶이지 않아. 그대로 두고 나눠." },
+
+  // 라운드 C — 문자와 숫자가 섞인다.
+  { round:"C", skin:"symbol", par:3,
+    L:[T(2,["box"]), T(1,["a"])], R:[T(1,["b"])], deck:["a","b",2,3],
+    hint:"양변에 −a를 더한 다음, 양변을 2로 나눠." },
+  { round:"C", skin:"symbol", par:3,
+    L:[T(3,["box"]), T(-5)], R:[T(1,["b"])], deck:[5,3,"b",2],
+    hint:"−5를 먼저 지우고, 그 다음 3으로 나눠." },
+  { round:"C", skin:"symbol", par:5,
+    L:[T(2,["box"]), T(1,["a"])], R:[T(1,["box"]), T(1,["b"])], deck:["box","a","b"],
+    hint:"양쪽에 x가 있어. 어두운 x를 양변에 더하면 한쪽이 정리돼." },
+
+  // 라운드 D — 상자가 분모에 있다. "상자가 아래에 있으면 전체에 상자를 곱해라."
+  { round:"D", skin:"symbol", par:2,
+    L:[T(1,["a"],1,["box"])], R:[T(1,["b"])], deck:["box","a","b"],
+    hint:"상자가 아래에 있어. 양변의 모든 항 위쪽에 x를 올려봐 — 아래위가 만나 사라진다." },
+  { round:"D", skin:"symbol", par:3,
+    L:[T(1,["d"],1,["c"])], R:[T(1,["a"],1,["box"])], deck:["box","a","c","d"],
+    hint:"먼저 x를 위로 올려 분모에서 꺼내고, 그 다음 c를 올리고, 마지막에 d로 나눠." },
+  { round:"D", skin:"symbol", par:2,
+    L:[T(1,["a"],1,["b","box"])], R:[T(1,["c"])], deck:["box","a","b","c"],
+    hint:"상자와 b가 같이 분모에 있어. x를 위로 올리면 상자만 빠져나온다." },
+  { round:"D", skin:"symbol", par:5,
+    L:[T(1,["i"]), T(1,["f"],1,["box"])], R:[T(1,["box"],1,["box"]), T(1,["i"])], deck:["box","f","i"],
+    hint:"오른쪽에 x/x가 보이지? 위아래가 같으면 1이야. 톡 쳐서 정리하고, 양쪽의 i를 지우고, 마지막에 x를 위로 올려." },
+  { round:"D", skin:"symbol", par:5,
+    L:[T(1,["d"],1,["box","d"])],
+    R:[T(1,["box","a"],1,["box"]), T(-1,["a"]), T(1,["f"])],
+    deck:["box","a","d","f"],
+    hint:"양쪽에 위아래가 같은 카드가 숨어 있어. 먼저 톡 쳐서 정리하고, a와 −a를 묶어." },
+
+  // 라운드 E — (−1)이 만나면 밝아진다
+  { round:"E", skin:"symbol", par:2,
+    L:[NEG(1, T(1,["box"]))], R:[T(1,["a"])], deck:["a","box",1],
+    hint:"(−1)을 톡 쳐서 계수에 합치면 −x가 돼. 그 다음 부호 카드로 뒤집어." },
+  { round:"E", skin:"symbol", par:2,
+    L:[NEG(2, T(1,["box"]))], R:[T(1,["a"])], deck:["a","box",1],
+    hint:"(−1)이 두 장이야. 톡 치면 둘이 만나 1이 되고, 한 번 더 치면 1도 사라진다." },
+  { round:"E", skin:"symbol", par:4,
+    L:[NEG(2, T(1,["box"])), T(1,["b"])], R:[T(1,["c"])], deck:["b","c","box"],
+    hint:"먼저 (−1) 두 장을 정리해서 x를 깨끗하게 만들고, 그 다음 b를 지워." },
+
+  // 라운드 F — 괄호. 밖의 카드는 안의 모든 항에 간다.
+  { round:"F", skin:"symbol", par:5,
+    L:[G({n:1,v:["a"]}, [T(1,["box"]), T(1,["b"])])], R:[T(1,["c"])], deck:["a","b","c"],
+    hint:"괄호를 톡 쳐서 a를 안의 모든 항에 넣어. 그 다음 양변을 a로 나누면 깨끗해진다." },
+  { round:"F", skin:"symbol", par:5,
+    L:[G({n:1,v:["a"]}, [T(1,["box"]), T(-1,["b"])])], R:[T(1,["d"])], deck:["a","b","d"],
+    hint:"안에 −b가 있어도 똑같아. a는 두 항 모두에 간다." },
+  { round:"F", skin:"symbol", par:6,
+    L:[G({n:1,v:["a"]}, [T(1,["box"]), T(1,["b"])])], R:[G({n:1,v:["a"]}, [T(1,["c"])])], deck:["a","b","c"],
+    hint:"양쪽 모두 괄호야. 둘 다 풀고 나서 a로 나눠." },
+
+  // 라운드 G — 묶어내기(인수분해). 분배의 정반대.
+  { round:"G", skin:"symbol", par:2,
+    L:[T(1,["a","box"]), T(1,["b","box"])], R:[T(1,["c"])], deck:["a","b","c","box"],
+    hint:"두 항에 모두 x가 들어 있어. 하나를 다른 하나 위로 끌어 묶어내 봐. 그 다음 생긴 괄호를 집어서 양변을 나눠." },
+  { round:"G", skin:"symbol", par:2,
+    L:[T(1,["a","box"]), T(1,["box"])], R:[T(1,["b"])], deck:["a","b","box"],
+    hint:"x 하나만 있는 항도 x를 품고 있어. 묶어내면 안에 1이 남는다." },
+  { round:"G", skin:"symbol", par:4,
+    L:[T(1,["a","box"]), T(1,["b","box"]), T(1,["c"])], R:[T(1,["d"])], deck:["a","b","c","d","box"],
+    hint:"먼저 c를 지워서 x가 든 항만 남기고, 그 다음 x를 묶어내." }
+];
+
+const ROUND_INFO = {
+  A: { name:"라운드 A", sub:"그림으로" },
+  B: { name:"라운드 B", sub:"숫자가 보인다" },
+  C: { name:"라운드 C", sub:"진짜 방정식" },
+  D: { name:"라운드 D", sub:"상자가 아래에" },
+  E: { name:"라운드 E", sub:"어두운 것 둘" },
+  F: { name:"라운드 F", sub:"괄호 풀기" },
+  G: { name:"라운드 G", sub:"묶어내기" }
+};
+
+/* ============================================================
+   상태
+   ============================================================ */
+let idx = 0, L = [], R = [], skin = "icon";
+let history = [], log = [], solved = false, near = null, pending = null;
+let busy = false, settleTimer = null, afterSettle = [];
+const SETTLE_MS = 760;
+
+const $ = id => document.getElementById(id);
+const panL = $("panL"), panR = $("panR"), deckEl = $("deck");
+
+function copyTerm(t){
+  const c = T(t.n, t.v, t.d, t.vd);
+  if(t.negs) c.negs = t.negs;
+  if(t.unit) c.unit = true;
+  if(t.g) c.g = t.g.map(copyTerm);
+  if(t.gd) c.gd = t.gd.map(copyTerm);
+  return c;
+}
+
+function load(i){
+  idx = i;
+  const lv = LEVELS[i];
+  uid = 1;
+  L = lv.L.map(copyTerm);
+  R = lv.R.map(copyTerm);
+  skin = lv.skin;
+  history = []; log = []; solved = false; near = null; pending = null;
+  busy = false; clearTimeout(settleTimer); afterSettle = [];
+  [panL, panR].forEach(p => p.classList.remove("near", "solved"));
+  buildDeck();
+  render();
+  updateBar();
+}
+
+function snapshot(){
+  history.push(JSON.stringify({ L, R, log, pending, u: uid }));
+  if(history.length > 60) history.shift();
+  $("undoBtn").disabled = false;
+}
+function undo(){
+  if(!history.length || busy) return;
+  const s = JSON.parse(history.pop());
+  L = s.L; R = s.R; log = s.log; pending = s.pending; uid = s.u;
+  solved = false; near = null;
+  panL.classList.remove("solved"); panR.classList.remove("solved");
+  $("undoBtn").disabled = history.length === 0;
+  render();
+  checkWin();
+}
+
+/* ============================================================
+   조작 — 한쪽에 놓으면 등호가 깨진다. 나머지 자리를 학생이 직접 채워야 다시 닫힌다.
+   ============================================================ */
+const sideArr = s => s === "L" ? L : R;
+const findTerm = (side, id) => sideArr(side).find(t => t.id === id);
+const cardLabel = (kind, value) =>
+  kind === "box" ? "x" : (kind !== "num" ? kind : Math.abs(value));
+const slotKey = s => `${s.side}:${s.isNew ? "new" : s.termId}${s.subIdx === undefined ? "" : ":" + s.subIdx}`;
+
+function newTermFor(kind, value, night){
+  return kind !== "num"
+    ? T(night ? -1 : 1, [kind])
+    : T(night ? -Math.abs(value) : Math.abs(value));
+}
+function applyCardTo(t, kind, value, night, op, subs){
+  if(kind === "group"){
+    // 같은 괄호가 이미 곱해져 있으면 서로 지워진다
+    if(t.g && groupSig(t.g) === value){ delete t.g; t._new = true; return; }
+    t.gd = (subs || []).map(copyTerm);
+    t._new = true;
+    return;
+  }
+  const sym = kind !== "num";
+  const before = { n: t.n, d: t.d };
+
+  if(op === "mul"){
+    if(sym){ t.v.push(kind); if(night) t.n *= -1; }
+    else t.n *= (night ? -Math.abs(value) : Math.abs(value));
+  } else {
+    if(sym){ t.vd.push(kind); if(night) t.n *= -1; }
+    else { t.d *= Math.abs(value); if(night) t.n *= -1; }
+  }
+
+  // 정규화 전 모습을 남긴다 — 학생이 '왜 사라졌는지'를 볼 수 있도록 한 박자 보여준 뒤 정리한다
+  const raw = { n: t.n, d: t.d, v: [...t.v], vd: [...t.vd], fresh: kind, freshIn: op === "mul" ? "v" : "vd" };
+  if(op === "mul" && !sym) raw.mulBy = { value: Math.abs(value), night, from: before.n };
+  norm(t);
+
+  const cancel = { sym: [], num: false };
+  raw.vd.forEach(id => { if(raw.v.includes(id) && !t.vd.includes(id)) cancel.sym.push(id); });
+  if(raw.d !== t.d || (raw.d !== 1 && Math.abs(raw.n) !== Math.abs(t.n))) cancel.num = true;
+
+  const changed = cancel.sym.length || cancel.num || raw.mulBy;
+  if(changed){ t._raw = raw; t._cancel = cancel; }
+  t._new = true;
+}
+
+/* 1단계 — 놓은 자리에만 적용하고, 남은 자리를 전부 연다 */
+function beginOp(payload, op, side, termId){
+  if(solved || pending) return;
+  if(op !== "add" && payload.kind !== "group" && [...L, ...R].some(t => t.g)){
+    say("괄호가 남아 있어. <b>괄호를 먼저 톡 쳐서</b> 풀어야 해.");
+    return;
+  }
+  snapshot();
+  const { kind, value, night } = payload;
+  const label = cardLabel(kind, value);
+  pending = { kind, value, night, op, slots: [], label: "" };
+
+  if(op === "add"){
+    const t = newTermFor(kind, value, night);
+    t._new = true;
+    sideArr(side).push(t);
+    pending.slots.push({ side: side === "L" ? "R" : "L", isNew: true });
+    pending.label = `양변에 ${night ? "−" : "＋"}${label}`;
+  } else {
+    applyCardTo(findTerm(side, termId), kind, value, night, op, payload.subs);
+    ["L", "R"].forEach(s => sideArr(s).forEach(t => {
+      if(s === side && t.id === termId) return;
+      pending.slots.push({ side: s, termId: t.id });
+    }));
+    pending.subs = payload.subs;
+    pending.label = kind === "group"
+      ? "양변을 괄호로 나눴다"
+      : `양변의 모든 항에 ${op === "mul" ? "×" : "÷"}${night ? "−" : ""}${label}`;
+  }
+
+  if(!pending.slots.length){ finishOp(); return; }
+  render();
+  say(op === "add"
+    ? "등호가 깨졌다. 반대쪽 빈 자리에 같은 카드를 놓아야 다시 닫힌다."
+    : "한 항에만 했다. 나머지 모든 항의 빈 자리를 채워야 등호가 유지된다.");
+}
+
+/* 괄호 풀기 — 바깥 카드가 안의 모든 항에 간다 */
+function beginDistribute(side, termId){
+  if(solved || pending || busy) return;
+  const host = findTerm(side, termId);
+  if(!host || !host.g) return;
+
+  const num = host.v.length === 0;
+  if(!num && host.v.length !== 1){ shake(side, termId); say("괄호 밖 카드가 하나일 때만 풀 수 있어."); return; }
+  const kind  = num ? "num" : host.v[0];
+  const value = num ? Math.abs(host.n) : 1;
+  const night = host.n < 0;
+  if(num && value === 1 && !night){
+    shake(side, termId); say("1을 곱하면 아무것도 변하지 않아. 괄호를 그냥 벗겨도 돼."); 
+    return;
+  }
+
+  snapshot();
+  host.n = 1; host.v = [];                  // 바깥 카드는 안으로 들어간다
+  applyCardTo(host.g[0], kind, value, night, "mul", null);
+
+  pending = { kind, value, night, op: "mul", slots: [],
+              label: `괄호 안 모든 항에 ×${night ? "−" : ""}${cardLabel(kind, value)}`,
+              dissolve: { side, termId } };
+  for(let i = 1; i < host.g.length; i++) pending.slots.push({ side, termId, subIdx: i });
+
+  if(!pending.slots.length){ dissolveGroup(side, termId); finishOp(); return; }
+  render();
+  say("밖에 있던 카드는 <b>괄호 안 모든 항</b>에 간다. 나머지 빈 자리를 채워.");
+}
+
+/* 분배가 끝나면 괄호가 사라지고 안의 항들이 밖으로 나온다 */
+function dissolveGroup(side, termId){
+  const arr = sideArr(side);
+  const i = arr.findIndex(t => t.id === termId);
+  if(i < 0) return;
+  const host = arr[i];
+  if(!host.g) return;
+  const subs = host.g.map(s => { s._new = true; return s; });
+  arr.splice(i, 1, ...subs);
+}
+
+/* 2단계 — 학생이 빈 자리를 하나씩 채운다 */
+function fillSlot(slot, payload){
+  if(!pending) return;
+  const same = payload.kind === pending.kind &&
+               payload.night === pending.night &&
+               (pending.kind !== "num" || Math.abs(payload.value) === Math.abs(pending.value)) &&
+               (pending.kind !== "group" || payload.value === pending.value);
+  if(!same){
+    say(pending.kind === "group"
+      ? "반대쪽에도 <b>같은 괄호</b>로 나눠야 해."
+      : `같은 카드여야 해. 반대쪽에는 똑같이 ${pending.night ? "어두운 " : ""}${cardLabel(pending.kind, pending.value)}가 들어간다.`);
+    return;
+  }
+  const { kind, value, night, op } = pending;
+  if(slot.isNew){
+    const t = newTermFor(kind, value, night);
+    t._new = true;
+    sideArr(slot.side).push(t);
+  } else if(slot.subIdx !== undefined){
+    const host = findTerm(slot.side, slot.termId);
+    if(host && host.g) applyCardTo(host.g[slot.subIdx], kind, value, night, op, pending.subs);
+  } else {
+    applyCardTo(findTerm(slot.side, slot.termId), kind, value, night, op, pending.subs);
+  }
+  pending.slots = pending.slots.filter(s => s !== slot);
+  if(pending.slots.length){ render(); return; }
+  if(pending.dissolve) dissolveGroup(pending.dissolve.side, pending.dissolve.termId);
+  finishOp();
+}
+
+function finishOp(){
+  if(pending){ log.push(pending.label); pending = null; }
+  cleanup();
+  render();
+  flashPans();
+  checkWin();
+}
+
+/* 부호 카드 — 양변에 −1을 곱한다. 모드와 무관하게 언제나 같은 일을 한다. */
+function flipSigns(srcEl){
+  if(solved || busy) return;
+  if(pending){ say("먼저 빈 자리를 다 채워 등호를 닫아야 해."); return; }
+  snapshot();
+  busy = true;
+  document.querySelectorAll(".pan .c").forEach(c => c.classList.add("flip"));
+  setTimeout(() => {
+    const each = t => { t.n *= -1; t._new = true; norm(t); };
+    L.forEach(each); R.forEach(each);
+    log.push("양변에 ×(−1) — 모든 항의 부호가 뒤집혔다");
+    busy = false;
+    cleanup();
+    render();
+    flashPans();
+    checkWin();
+  }, 340);
+}
+
+/* ============================================================
+   드래그 — 어디에 놓느냐가 곧 어떤 연산인가
+     빈 곳      → 양변에 새 항으로 더하기
+     항 위쪽    → 양변 모든 항에 곱하기
+     항 아래쪽  → 양변 모든 항의 분모로
+     항 → 항    → 둘을 하나로 묶기
+   ============================================================ */
+let drag = null;
+
+function startDrag(e, payload, el){
+  if(solved || drag || busy) return;
+  if(e.button !== undefined && e.button !== 0) return;
+  e.preventDefault();
+
+  const r = el.getBoundingClientRect();
+  const ghost = el.cloneNode(true);
+  ghost.classList.add("ghost");
+  Object.assign(ghost.style, {
+    position: "fixed", margin: "0", zIndex: "60", pointerEvents: "none",
+    left: r.left + "px", top: r.top + "px",
+    width: r.width + "px", height: r.height + "px"
+  });
+  document.body.appendChild(ghost);
+
+  drag = { payload, ghost, dx: e.clientX - r.left, dy: e.clientY - r.top, zone: null,
+           x0: e.clientX, y0: e.clientY, moved: false };
+  document.body.classList.add("dragging", payload.type === "term" ? "dragterm" : "dragcard");
+
+  window.addEventListener("pointermove", onDragMove);
+  window.addEventListener("pointerup", onDragEnd);
+  window.addEventListener("pointercancel", onDragEnd);
+}
+
+function resolveZone(x, y){
+  const el = document.elementFromPoint(x, y);
+  if(!el) return null;
+
+  // 등호가 깨져 있는 동안엔 빈 자리 채우기만 허용한다
+  if(pending){
+    if(drag.payload.type !== "card") return null;
+    const d = el.closest(".c.drop");
+    if(!d) return null;
+    const slot = pending.slots.find(s => slotKey(s) === d.dataset.slot);
+    return slot ? { op:"fill", el:d, slot } : null;
+  }
+
+  const term = el.closest(".term");
+  if(term){
+    const side = term.closest("#panL") ? "L" : "R";
+    const id = Number(term.dataset.id);
+    if(drag.payload.type === "term"){
+      if(drag.payload.side !== side || drag.payload.id === id) return null;
+      return { op: "merge", el: term, side, id };
+    }
+    const r = term.getBoundingClientRect();
+    const half = y < r.top + r.height / 2 ? "mul" : "div";
+    if(drag.payload.kind === "group" && half !== "div") return null;   // 괄호는 나누기만
+    return { op: half, el: term, side, id };
+  }
+
+  const pan = el.closest(".pan");
+  if(pan && drag.payload.kind === "group") return null;   // 괄호는 새 항이 될 수 없다
+  if(pan && drag.payload.type === "card")
+    return { op: "add", el: pan, side: pan.id === "panL" ? "L" : "R" };
+  return null;
+}
+
+function paintZone(z){
+  const prev = drag.zone;
+  if(prev && prev.el) prev.el.classList.remove("zone", "zone-mul", "zone-div", "zone-merge", "zone-fill");
+  if(z && z.el) z.el.classList.add(z.op === "add" ? "zone" : "zone-" + z.op);
+  drag.zone = z;
+}
+
+function onDragMove(e){
+  if(!drag) return;
+  if(!drag.moved && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > 7) drag.moved = true;
+  drag.ghost.style.left = (e.clientX - drag.dx) + "px";
+  drag.ghost.style.top = (e.clientY - drag.dy) + "px";
+  paintZone(resolveZone(e.clientX, e.clientY));
+}
+
+function onDragEnd(e){
+  if(!drag) return;
+  const z = resolveZone(e.clientX, e.clientY);
+  paintZone(null);
+  drag.ghost.remove();
+  document.body.classList.remove("dragging", "dragterm", "dragcard");
+  window.removeEventListener("pointermove", onDragMove);
+  window.removeEventListener("pointerup", onDragEnd);
+  window.removeEventListener("pointercancel", onDragEnd);
+
+  const p = drag.payload;
+  const tapped = !drag.moved;
+  drag = null;
+
+  // 끌지 않고 톡 쳤다 → 그 항을 정리한다 (위아래 같은 카드 약분, 숫자 약분)
+  if(tapped && p.kind === "group"){ reduceTerm(p.hostSide, p.hostId); return; }
+  if(tapped && p.type === "term"){ reduceTerm(p.side, p.id); return; }
+  if(!z) return;
+
+  if(z.op === "fill") fillSlot(z.slot, p);
+  else if(z.op === "merge") mergeTerms(z.side, p.id, z.id);
+  else beginOp(p, z.op, z.side, z.id);
+}
+
+/* 두 항에 공통으로 들어 있는 것 — 있으면 묶어낼 수 있다 */
+function commonFactor(a, b){
+  if(a.g || b.g || a.gd || b.gd) return null;
+  if(negCount(a) || negCount(b) || a.unit || b.unit) return null;
+  if(a.d !== 1 || b.d !== 1 || a.vd.length || b.vd.length) return null;
+  const syms = a.v.filter(s => b.v.includes(s));
+  const num = gcd(Math.abs(a.n), Math.abs(b.n));
+  if(!syms.length && num <= 1) return null;
+  return { syms, num: num > 1 ? num : 1 };
+}
+
+/* 공통인수로 묶는다 — 분배의 정반대 */
+function factorOut(side, idA, idB, cf){
+  snapshot();
+  const arr = side === "L" ? L : R;
+  const a = arr.find(x => x.id === idA), b = arr.find(x => x.id === idB);
+  const keep = Math.min(arr.indexOf(a), arr.indexOf(b));
+
+  const strip = t => {
+    const v = [...t.v];
+    cf.syms.forEach(s => { const i = v.indexOf(s); if(i > -1) v.splice(i, 1); });
+    return T(t.n / cf.num, v);
+  };
+  const inside = [strip(b), strip(a)];          // 끌어온 쪽이 뒤로 붙는다
+  if(arr.indexOf(a) < arr.indexOf(b)) inside.reverse();
+
+  const host = Object.assign(T(cf.num, cf.syms), { g: inside });
+  host._new = true;
+  const rest = arr.filter(x => x !== a && x !== b);
+  rest.splice(keep, 0, host);
+  if(side === "L") L = rest; else R = rest;
+
+  const name = cf.syms.map(s => s === "box" ? "x" : s).join("·") || String(cf.num);
+  log.push(`공통으로 들어 있는 ${name}를 밖으로 묶어냈다`);
+  say(`두 항에 모두 <b>${name}</b>가 들어 있었어. 밖으로 묶어냈다 — <b>분배의 반대</b>야.`);
+  cleanup(); render(); checkWin();
+}
+
+/* 항 하나를 정리한다 — 위아래에 같은 카드가 있으면 1이 되어 사라진다 (규칙 4) */
+const reducible = t =>
+  negCount(t) >= 1 || t.unit ||
+  t.v.some(id => t.vd.includes(id)) || (t.d !== 1 && gcd(t.n, t.d) > 1);
+
+function reduceTerm(side, id){
+  if(solved || pending || busy) return;
+  const t = findTerm(side, id);
+  if(!t) return;
+  if(t.g){ beginDistribute(side, id); return; }
+  if(!reducible(t)){ shake(side, id); say("이 항은 더 정리할 게 없어."); return; }
+
+  // (−1) 카드 두 장이 만나면 1이 된다 — 수포자가 가장 많이 틀리는 자리
+  if(negCount(t) >= 2){
+    snapshot();
+    const raw = { n: t.n, d: t.d, v: [...t.v], vd: [...t.vd], negs: t.negs, _negGone: true };
+    t.negs -= 2; t.unit = true;
+    t._raw = raw; t._cancel = { sym: [], num: false }; t._new = true;
+    log.push("(−1)과 (−1)이 만나 1이 됐다");
+    say("어두운 것 <b>둘</b>이 만나면 밝아진다 — (−1)×(−1) = <b>1</b>.");
+    cleanup(); render(); checkWin();
+    return;
+  }
+  if(negCount(t) === 1){
+    snapshot();
+    t.negs = 0; t.n *= -1; t._new = true;
+    log.push("(−1)을 계수에 합쳤다");
+    cleanup(); render(); checkWin();
+    return;
+  }
+  if(t.unit){
+    snapshot();
+    const raw = { n: t.n, d: t.d, v: [...t.v], vd: [...t.vd], unit: true, _unitGone: true };
+    t.unit = false;
+    t._raw = raw; t._cancel = { sym: [], num: false }; t._new = true;
+    log.push("1을 곱해도 그대로 — 1이 사라졌다");
+    cleanup(); render(); checkWin();
+    return;
+  }
+
+  snapshot();
+  const raw = { n: t.n, d: t.d, v: [...t.v], vd: [...t.vd] };
+  norm(t);
+  const cancel = { sym: [], num: false };
+  raw.vd.forEach(k => { if(raw.v.includes(k) && !t.vd.includes(k)) cancel.sym.push(k); });
+  if(raw.d !== t.d) cancel.num = true;
+  t._raw = raw; t._cancel = cancel; t._new = true;
+
+  log.push(cancel.sym.length
+    ? "위아래에 같은 카드 — 만나서 1이 됐다"
+    : "분자와 분모를 같은 수로 나눴다");
+  cleanup();
+  render();
+  checkWin();
+}
+
+/* 항 두 개를 하나로 — 상쇄와 동류항 정리를 한 동작으로 */
+function mergeTerms(side, idA, idB){
+  if(solved || pending || busy || idA === idB) return;
+  const arr = side === "L" ? L : R;
+  const t = arr.find(x => x.id === idA);
+  const other = arr.find(x => x.id === idB);
+  if(!t || !other) return;
+
+  if(!sameKind(t, other)){
+    const cf = commonFactor(t, other);
+    if(cf){ factorOut(side, idA, idB, cf); return; }
+    shake(side, idB);
+    say("같은 종류도 아니고 공통으로 들어 있는 카드도 없어.");
+    return;
+  }
+
+  snapshot();
+  const sum = t.n + other.n;
+  const keep = Math.min(arr.indexOf(t), arr.indexOf(other));
+
+  // 먼저 보여준다: 끌어온 항이 상대 위로 빨려 들어가고, 0이 되면 둘 다 흩어진다
+  const pan = side === "L" ? panL : panR;
+  const elA = pan.querySelector(`.term[data-id="${idA}"]`);
+  const elB = pan.querySelector(`.term[data-id="${idB}"]`);
+  busy = true;
+  if(elA && elB){
+    const ra = elA.getBoundingClientRect(), rb = elB.getBoundingClientRect();
+    elA.style.setProperty("--dx", (rb.left - ra.left) + "px");
+    elA.style.setProperty("--dy", (rb.top - ra.top) + "px");
+    elA.classList.add("suck");
+    elB.classList.add(sum === 0 ? "out-late" : "absorb");
+  }
+
+  setTimeout(() => {
+    const rest = arr.filter(x => x !== t && x !== other);
+    if(sum !== 0){
+      const merged = norm(T(sum, t.v, t.d, t.vd));
+      merged._new = true;
+      rest.splice(keep, 0, merged);
+      log.push("같은 항 묶기");
+    } else {
+      log.push("밝은 카드와 어두운 카드가 만나 0이 됐다");
+      say("사라졌다. 밝은 것과 어두운 것이 만나면 <b>0</b>.");
+    }
+    if(side === "L") L = rest; else R = rest;
+    busy = false;
+    cleanup();
+    render();
+    checkWin();
+  }, 420);
+}
+
+function cleanup(){
+  L = L.filter(t => !isZero(t));
+  R = R.filter(t => !isZero(t));
+  if(!L.length) L = [T(0)];
+  if(!R.length) R = [T(0)];
+  // 각 조작이 자기 항을 직접 정규화하므로 여기서 일괄 정규화하지 않는다.
+  // 그래야 문제에 미리 들어 있는 x/x 같은 항이 학생이 손대기 전까지 그대로 남는다.
+}
+
+function checkWin(){
+  if(busy){ afterSettle.push(checkWin); return; }
+  if(pending) return;
+  // 반대쪽에 '더 묶을 수 있는 항'이 남아 있으면 아직 끝이 아니다.
+  const tidy = arr => !arr.some((t, i) => arr.some((o, j) => j > i && sameKind(t, o)));
+  const test = (a, b) => a.length === 1 && isLoneBox(a[0]) && !b.some(hasBox) && tidy(b);
+  const isolated = (a, b) => a.length === 1 && isLoneBox(a[0]) && !b.some(hasBox);
+
+  if(test(L, R) || test(R, L)){
+    solved = true;
+    near = null;
+    panL.classList.remove("near"); panR.classList.remove("near");
+    panL.classList.add("solved"); panR.classList.add("solved");
+    setTimeout(showWin, 550);
+    return;
+  }
+
+  // 상자가 어두워진 상태 — 막다른 길처럼 보이는 지점. 탈출구를 알려준다.
+  const negBox = a => a.length === 1 && a[0].n === -1 && a[0].d === 1 &&
+                      a[0].v.length === 1 && a[0].v[0] === "box" && a[0].vd.length === 0;
+
+  const boxDown = [...L, ...R].some(t => t.vd.includes("box"));
+  const selfPair = [...L, ...R].some(t => t.v.some(k => t.vd.includes(k)));
+  const anyGroup = [...L, ...R].some(t => t.g);
+  const anyNeg = [...L, ...R].some(t => negCount(t) >= 2);
+  const canFactor = ["L","R"].some(s => {
+    const a = s === "L" ? L : R;
+    return a.some((t, i) => a.some((o, j) => j > i && !sameKind(t, o) && commonFactor(t, o)));
+  });
+  const grabPar = [...L, ...R].some(t => t.g && !t.g.some(hasBox));
+
+  let kind = null;
+  if((negBox(L) && !R.some(hasBox)) || (negBox(R) && !L.some(hasBox))) kind = "sign";
+  else if(isolated(L, R) || isolated(R, L)) kind = "tidy";
+  else if(grabPar) kind = "divpar";
+  else if(anyGroup && log.length === 0) kind = "paren";
+  else if(canFactor && log.length === 0) kind = "factor";
+  else if(anyNeg && log.length === 0) kind = "negpair";
+  else if(selfPair && log.length === 0) kind = "pair";
+  else if(boxDown && log.length === 0) kind = "down";
+
+  const quiet = kind === "down" || kind === "pair" || kind === "paren" ||
+                kind === "negpair" || kind === "factor" || kind === "divpar";
+  panL.classList.toggle("near", !!kind && !quiet);
+  panR.classList.toggle("near", !!kind && !quiet);
+  if(kind && kind !== near){
+    say(kind === "sign"
+      ? "상자가 어두워졌어. 부호 카드 ×(−1)을 누르면 양변이 한 번에 뒤집힌다."
+      : kind === "divpar"
+      ? "괄호 바깥에 <b>x만</b> 남았다. 이제 <b>괄호를 집어서</b> 양변을 그걸로 나눠."
+      : kind === "factor"
+      ? "두 항에 <b>같은 카드</b>가 들어 있어. 하나를 다른 하나 위로 끌면 <b>밖으로 묶어낼</b> 수 있다."
+      : kind === "paren"
+      ? "괄호가 보인다. 괄호 항을 <b>톡 치면</b> 밖의 카드가 <b>안의 모든 항</b>으로 들어간다."
+      : kind === "negpair"
+      ? "어두운 카드 <b>(−1)</b>이 두 장 붙어 있어. 톡 쳐서 합쳐봐."
+      : kind === "pair"
+      ? "어떤 항은 <b>위아래에 똑같은 카드</b>가 있어. 그 항을 <b>톡 치면</b> 둘이 만나 1이 된다."
+      : kind === "down"
+      ? "상자가 <b>아래</b>에 있다. 아래에 있는 건 위로 끌어올려야 꺼낼 수 있어 — 양변의 모든 항 <b>위쪽</b>에 x를 올려봐."
+      : "상자를 혼자 남겼다. 반대쪽에 아직 묶을 수 있는 게 남았어.");
+  }
+  near = kind;
+}
+
+/* ============================================================
+   그리기
+   ============================================================ */
+function slotEl(slot){
+  const s = document.createElement("div");
+  s.className = "c drop";
+  s.dataset.slot = slotKey(slot);
+  s.innerHTML = `<span class="q">?</span>`;
+  return s;
+}
+
+const dot = () => { const s = document.createElement("span"); s.className = "dot"; s.textContent = "·"; return s; };
+
+/* 괄호로 둘러싼 항 묶음을 그린다 */
+function parenEl(subs, slotFor){
+  const row = document.createElement("div");
+  row.className = "group";
+  const open = document.createElement("span"); open.className = "paren"; open.textContent = "(";
+  const close = document.createElement("span"); close.className = "paren"; close.textContent = ")";
+  const inner = document.createElement("div"); inner.className = "inner";
+  subs.forEach((s, i) => {
+    if(i > 0 || s.n < 0){
+      const op = document.createElement("span");
+      op.className = "op"; op.textContent = s.n < 0 ? "−" : "＋";
+      inner.appendChild(op);
+    }
+    const box = document.createElement("div");
+    box.className = "sub";
+    box.appendChild(bodyOf(s, slotFor ? slotFor(i) : null));
+    inner.appendChild(box);
+  });
+  row.append(open, inner, close);
+  return row;
+}
+
+/* 항 하나의 몸통을 그린다 (분수/행). 괄호 안의 항에도 그대로 쓴다. */
+function bodyOf(t, mySlot){
+  const src = t._raw || t;
+  const cancel = t._cancel || { sym: [], num: false };
+  const symLeft = { v: [...cancel.sym], vd: [...cancel.sym] };
+  const mark = (el, where, id) => {
+    const i = symLeft[where].indexOf(id);
+    if(i > -1){ symLeft[where].splice(i, 1); el.classList.add("cancel"); }
+    return el;
+  };
+  const fresh = (el, where, id) => {
+    if(t._raw && t._raw.fresh === id && t._raw.freshIn === where){ el.classList.add("land"); }
+    return el;
+  };
+
+  const numRow = document.createElement("div");
+  numRow.className = "row";
+  const mag = Math.abs(src.n);
+  const night = src.n < 0;
+
+  if(mySlot && pending.op === "mul") numRow.appendChild(slotEl(mySlot));
+
+  // 아직 합쳐지지 않은 (−1) 카드들
+  for(let i = 0; i < negCount(src); i++){
+    if(numRow.children.length) numRow.appendChild(dot());
+    const c = cardEl("neg1", 0, false, skin);
+    if(src._negGone) c.classList.add("cancel");
+    numRow.appendChild(c);
+  }
+
+  if(src.unit){
+    if(numRow.children.length) numRow.appendChild(dot());
+    const one = cardEl("num", 1, false, skin);
+    if(src._unitGone) one.classList.add("cancel");
+    if(src._unitNew) one.classList.add("land");
+    numRow.appendChild(one);
+  } else if(src.mulBy){
+    // 곱하기: 원래 계수 × 새 카드 두 장이 잠깐 보였다가 하나로 합쳐진다
+    const from = Math.abs(src.mulBy.from);
+    if(from !== 1 || !src.v.length){
+      const c = cardEl("num", from, src.mulBy.from < 0, skin); c.classList.add("cancel"); numRow.appendChild(c);
+    }
+    const k = cardEl("num", src.mulBy.value, src.mulBy.night, skin); k.classList.add("land"); numRow.appendChild(k);
+  } else if(!(mag === 1 && (src.v.length || negCount(src)))){   // 1·a 는 a 로 (규칙 3)
+    if(numRow.children.length) numRow.appendChild(dot());
+    const c = cardEl("num", mag, night, skin);
+    if(cancel.num) c.classList.add("cancel");
+    numRow.appendChild(c);
+  }
+
+  src.v.forEach(v => {
+    if(numRow.children.length) numRow.appendChild(dot());
+    numRow.appendChild(fresh(mark(cardEl(v, 0, night && !negCount(src), skin), "v", v), "v", v));
+  });
+
+  const needDen = src.d !== 1 || src.vd.length || src.gd || (mySlot && pending.op === "div");
+  if(!needDen) return numRow;
+
+  const f = document.createElement("div");
+  f.className = "frac";
+  const den = document.createElement("div");
+  den.className = "row";
+  if(src.d !== 1){
+    const c = cardEl("num", src.d, false, skin);
+    if(cancel.num) c.classList.add("cancel");
+    if(t._raw && t._raw.fresh === "num" && t._raw.freshIn === "vd") c.classList.add("land");
+    den.appendChild(c);
+  }
+  src.vd.forEach(v => {
+    if(den.children.length) den.appendChild(dot());
+    den.appendChild(fresh(mark(cardEl(v, 0, false, skin), "vd", v), "vd", v));
+  });
+  if(src.gd){
+    const gp = parenEl(src.gd, null);
+    gp.classList.add("asDiv");
+    den.appendChild(gp);
+  }
+  if(mySlot && pending.op === "div") den.appendChild(slotEl(mySlot));
+  const line = document.createElement("div");
+  line.className = "bar-line";
+  f.append(numRow, line, den);
+  return f;
+}
+
+function termEl(t, side){
+  const wrap = document.createElement("div");
+  wrap.className = "term";
+  if(t._new && !t._raw){ wrap.classList.add("in"); }
+  wrap.dataset.id = t.id;
+
+  const slotFor = sub => pending
+    ? pending.slots.find(s => !s.isNew && s.side === side && s.termId === t.id &&
+                              (sub === undefined ? s.subIdx === undefined : s.subIdx === sub))
+    : null;
+
+  const mySlot = slotFor();
+  if(mySlot) wrap.classList.add("waiting");
+
+  if(t.g){
+    // 괄호 항 — 바깥 카드 · ( 안의 항들 )
+    wrap.classList.add("grouped");
+    const row = document.createElement("div");
+    row.className = "group";
+    const outer = bodyOf({ n: t.n, d: 1, v: t.v, vd: [] }, null);
+    row.appendChild(outer);
+    if(outer.children.length) row.appendChild(dot());
+
+    const pe = parenEl(t.g, slotFor);
+    pe.classList.add("grabbable");
+    // 괄호만 따로 집으면 "양변을 이 괄호로 나누기"가 된다
+    pe.addEventListener("pointerdown", e => {
+      e.stopPropagation();
+      startDrag(e, { type:"card", kind:"group", value: groupSig(t.g), night:false,
+                     subs: t.g.map(copyTerm), hostSide: side, hostId: t.id }, pe);
+    });
+    row.appendChild(pe);
+    wrap.appendChild(row);
+  } else {
+    wrap.appendChild(bodyOf(t, mySlot));
+  }
+
+  wrap.addEventListener("pointerdown", e => startDrag(e, { type:"term", side, id:t.id }, wrap));
+  return wrap;
+}
+
+function renderPan(pan, arr, side){
+  pan.innerHTML = "";
+  arr.forEach((t, i) => {
+    if(i > 0 || t.n < 0){
+      const op = document.createElement("span");
+      op.className = "op";
+      op.textContent = t.n < 0 ? "−" : "＋";
+      pan.appendChild(op);
+    }
+    pan.appendChild(termEl(t, side));
+  });
+
+  // 새 항이 들어가야 할 자리
+  const ns = pending ? pending.slots.find(s => s.isNew && s.side === side) : null;
+  if(ns){
+    const op = document.createElement("span");
+    op.className = "op";
+    op.textContent = pending.night ? "−" : "＋";
+    pan.append(op, slotEl(ns));
+  }
+  arr.forEach(t => delete t._new);
+}
+
+function render(){
+  renderPan(panL, L, "L");
+  renderPan(panR, R, "R");
+  const eq = $("eq");
+  eq.textContent = pending ? "≠" : "=";
+  eq.classList.toggle("broken", !!pending);
+  document.body.classList.toggle("open-eq", !!pending);
+  panL.classList.toggle("solved", solved);
+  panR.classList.toggle("solved", solved);
+  $("undoBtn").disabled = history.length === 0 || busy;
+  updateMoves();
+
+  // 정규화 전 모습을 그린 항이 있으면, 잠시 뒤 정리된 모습으로 다시 그린다
+  if([...L, ...R].some(t => t._raw)){
+    busy = true;
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => {
+      [...L, ...R].forEach(t => { delete t._raw; delete t._cancel; t._new = true; });
+      busy = false;
+      render();
+      const q = afterSettle; afterSettle = [];
+      q.forEach(f => f());
+    }, SETTLE_MS);
+  }
+}
+
+function buildDeck(){
+  deckEl.innerHTML = "";
+  LEVELS[idx].deck.forEach(spec => {
+    const sym = typeof spec === "string";
+    const name = spec === "box" ? "상자" : spec;
+    [["낮", false], ["밤", true]].forEach(([label, night]) => {
+      const slot = document.createElement("div");
+      slot.className = "slot";
+      const c = cardEl(sym ? spec : "num", sym ? 0 : spec, night, skin);
+      c.tabIndex = 0;
+      c.setAttribute("role", "button");
+      c.setAttribute("aria-label", `${night ? "어두운" : "밝은"} ${name} 카드`);
+      const payload = { type:"card", kind: sym ? spec : "num", value: sym ? 1 : spec, night };
+      c.addEventListener("pointerdown", e => startDrag(e, payload, c));
+      c.addEventListener("keydown", e => {
+        if(e.key === "Enter" || e.key === " "){
+          e.preventDefault();
+          if(pending) fillSlot(pending.slots[0], payload);
+          else beginOp(payload, "add", "L");
+        }
+      });
+      const lbl = document.createElement("span");
+      lbl.className = "lbl";
+      lbl.textContent = label;
+      slot.append(c, lbl);
+      deckEl.appendChild(slot);
+    });
+  });
+
+  // 어느 문제에서든 쓸 수 있는 도구 — 상자가 어두워졌을 때의 탈출구
+  const tool = document.createElement("div");
+  tool.className = "slot tool";
+  const neg = document.createElement("div");
+  neg.className = "c neg";
+  neg.innerHTML = `<span class="num">×(−1)</span>`;
+  neg.tabIndex = 0;
+  neg.setAttribute("role", "button");
+  neg.setAttribute("aria-label", "양변의 부호를 모두 뒤집기");
+  neg.addEventListener("click", () => flipSigns(neg));
+  neg.addEventListener("keydown", e => {
+    if(e.key === "Enter" || e.key === " "){ e.preventDefault(); flipSigns(neg); }
+  });
+  const tlbl = document.createElement("span");
+  tlbl.className = "lbl";
+  tlbl.textContent = "부호";
+  tool.append(neg, tlbl);
+  deckEl.appendChild(tool);
+}
+
+function updateMoves(){
+  const m = $("moves"), n = log.length, par = LEVELS[idx].par;
+  const was = m.firstChild && m.firstChild.textContent;
+  m.innerHTML = `${n}<small>/${par}</small>`;
+  m.classList.toggle("over", n > par);
+  if(was !== null && String(n) !== was){ m.classList.add("bump"); setTimeout(() => m.classList.remove("bump"), 160); }
+}
+
+function updateBar(){
+  const lv = LEVELS[idx], info = ROUND_INFO[lv.round];
+  $("stageName").textContent = info.name;
+  $("stageSub").textContent = info.sub;
+  updateMoves();
+  const pips = $("pips");
+  pips.innerHTML = "";
+  LEVELS.forEach((l, i) => {
+    const p = document.createElement("span");
+    p.className = "pip" + (i < idx ? " done" : i === idx ? " now" : "");
+    pips.appendChild(p);
+  });
+}
+
+/* ---------- 작은 효과들 ---------- */
+let msgTimer;
+const GOAL_DEFAULT = $("goal").innerHTML;
+function say(text){
+  const g = $("goal");
+  g.innerHTML = text;
+  g.classList.add("speak");
+  clearTimeout(msgTimer);
+  msgTimer = setTimeout(() => { g.innerHTML = GOAL_DEFAULT; g.classList.remove("speak"); }, 3000);
+}
+function shake(side, id){
+  const pan = side === "L" ? panL : panR;
+  const el = pan.querySelector(`.term[data-id="${id}"]`);
+  if(!el) return;
+  el.classList.add("shake");
+  setTimeout(() => el.classList.remove("shake"), 320);
+}
+function flashPans(){
+  [panL, panR].forEach(p => {
+    p.classList.add("flash");
+    setTimeout(() => p.classList.remove("flash"), 320);
+  });
+}
+/* 카드가 양쪽으로 갈라져 날아가는 모습 — "양변에 똑같이"를 눈으로 */
+function fly(srcEl){
+  if(window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const from = srcEl.getBoundingClientRect();
+  [panL, panR].forEach(pan => {
+    const to = pan.getBoundingClientRect();
+    const g = srcEl.cloneNode(true);
+    g.classList.add("fly");
+    g.style.left = from.left + "px";
+    g.style.top = from.top + "px";
+    g.style.width = from.width + "px";
+    g.style.height = from.height + "px";
+    document.body.appendChild(g);
+    requestAnimationFrame(() => {
+      g.style.transform =
+        `translate(${to.left + to.width/2 - from.left - from.width/2}px,
+                   ${to.top + to.height/2 - from.top - from.height/2}px) scale(.85)`;
+      g.style.opacity = "0";
+    });
+    setTimeout(() => g.remove(), 420);
+  });
+}
+
+/* ============================================================
+   완료 화면 — 여기서 '정체'를 밝힌다
+   ============================================================ */
+const veil = $("veil"), sheet = $("sheet");
+function openSheet(html){ sheet.innerHTML = html; veil.classList.add("show"); document.body.classList.add("reveal"); }
+function closeSheet(){ veil.classList.remove("show"); document.body.classList.remove("reveal"); }
+
+function logHTML(){
+  return `<div class="log">` +
+    log.map((s, i) => `<div><span class="i">${i + 1}</span><span>${s}</span></div>`).join("") +
+    `</div>`;
+}
+
+const REVEALS = {
+  2: { // 라운드 A 끝
+    h: "그 그림들은 사실 문자였어",
+    p: `카드들은 <b>a, b, c</b>라는 이름을 가진 '어떤 수'였고, 상자는 <b>x</b>였어.
+        답이 딱 떨어지는 숫자가 아니어도 괜찮아 — <b>x = b − a</b> 같은 식도 완전한 답이야.
+        다음 라운드에서 이름을 보여줄게. 규칙은 하나도 안 바뀐다.`
+  },
+  5: { // 라운드 B 끝
+    h: "한쪽에 하면 반드시 반대쪽에도",
+    p: `곱하고 나눌 때는 <b>양변의 모든 항</b>에 걸린다. 한 항만 나누면 저울이 기울어.
+        그리고 혼자 있는 카드를 먼저 치워야 나중이 편하다는 것도 알았을 거야.
+        다음 라운드에선 문자와 숫자가 섞인다.`
+  },
+  13: { // 라운드 D 끝
+    h: "어두운 것이 겹치면",
+    p: `다음 라운드엔 <b>(−1)</b> 카드가 여러 장 붙어 나온다.
+        어두운 것 둘이 만나면 어떻게 될까? 직접 톡 쳐서 확인해 봐.`
+  },
+  19: { // 라운드 F 끝
+    h: "이번엔 거꾸로",
+    p: `지금까지는 괄호를 <b>풀었어</b>. 마지막 라운드에선 <b>괄호를 만든다</b>.
+        두 항에 같은 카드가 들어 있으면 밖으로 묶어낼 수 있어 — 학교에서는 이걸 <b>인수분해</b>라고 불러.`
+  },
+  16: { // 라운드 E 끝
+    h: "밖에 있는 것은 안의 모두에게",
+    p: `마지막은 <b>괄호</b>야. 괄호 밖의 카드는 <b>안의 한 항에만</b> 가는 게 아니라
+        <b>모든 항에</b> 간다. 이게 학교에서 말하는 <b>분배법칙</b>이야.`
+  },
+  8: { // 라운드 C 끝
+    h: "이제 상자가 숨는다",
+    p: `지금까지 상자는 늘 <b>위</b>에 있었어. 다음 라운드에선 상자가 <b>분모</b>로 내려간다.
+        규칙은 그대로야 — 다만 아래에 있는 것은 <b>같은 것을 위에 올려야</b> 꺼낼 수 있다.
+        아래위가 만나면 사라진다는 걸 기억해.`
+  }
+};
+
+function showWin(){
+  const last = idx === LEVELS.length - 1;
+  const rev = REVEALS[idx];
+
+  if(last){
+    openSheet(`
+      <h2>이제 진짜를 말해줄게</h2>
+      <p>학교에서는 이걸 <b>이항</b>이라고 불러 — "넘기면 부호가 바뀐다", "분모는 올려서 곱한다".
+         하지만 넌 한 번도 카드를 넘기지 않았어. 늘 양변에 같은 것을 했을 뿐이야.</p>
+      ${logHTML()}
+      <div class="compare">
+        <div class="mine"><h3>네가 한 일</h3>양변에 같은 카드를 더했고, 밝은 것과 어두운 것이 만나 사라졌다.
+          괄호 밖 카드를 안의 <b>모든</b> 항에 넣었고, 어두운 것 둘이 만나 밝아지는 걸 봤다.</div>
+        <div><h3>교과서의 줄임말</h3>"넘기면 부호가 바뀐다"<br>"괄호를 풀어 곱한다"<br>"음수끼리 곱하면 양수"</div>
+      </div>
+      <p class="sub">둘은 같은 일이야. 다만 '넘긴다'는 말은 <b>왜</b> 부호가 바뀌는지를 숨긴다.
+         이유를 아는 사람은 헷갈릴 때 되돌아올 곳이 있어.</p>
+      <div class="actions">
+        <button class="go" id="again">처음부터 다시</button>
+      </div>`);
+    $("again").onclick = () => { closeSheet(); load(0); };
+    return;
+  }
+
+  if(rev){
+    openSheet(`
+      <h2>${rev.h}</h2>
+      <p>${rev.p}</p>
+      ${logHTML()}
+      <div class="actions"><button class="go" id="next">다음 라운드</button></div>`);
+  } else {
+    openSheet(`
+      <h2>상자가 혼자 남았다</h2>
+      <p class="sub">${log.length}수로 풀었어${log.length <= LEVELS[idx].par ? " — 최소 수야." : ` (최소 ${LEVELS[idx].par}수).`}</p>
+      ${logHTML()}
+      <div class="actions"><button class="go" id="next">다음 문제</button></div>`);
+  }
+  $("next").onclick = () => { closeSheet(); load(idx + 1); };
+}
+
+/* ---------- 버튼 ---------- */
+$("resetBtn").onclick = () => load(idx);
+$("undoBtn").onclick = undo;
+$("hintBtn").onclick = () => say(LEVELS[idx].hint);
+document.addEventListener("keydown", e => {
+  if(e.key === "Escape") closeSheet();
+  if(e.key === "z" && (e.metaKey || e.ctrlKey)){ e.preventDefault(); undo(); }
+});
+
+load(0);
+</script>
+</body>
+</html>
